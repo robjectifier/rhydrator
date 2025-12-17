@@ -1,0 +1,15 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: 2025.11.21-16-g602915c
+_src_path: gh:scientific-python/cookie
+backend: hatch
+docs: sphinx
+email: sathabbott@gmail.com
+full_name: Samantha Abbott
+license: BSD
+org: robjectifier
+project_name: rhydrator
+project_short_description: A bidirectional data transformation tool for ROOT RNTuple
+    files. Dehydrates ROOT files into page bundles stored in an object store, and
+    rehydrates them back into functional ROOT files on demand.
+url: https://github.com/robjectifier/rhydrator
+vcs: true
