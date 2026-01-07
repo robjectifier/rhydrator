@@ -30,7 +30,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = ["rootfilespec"]
+dependencies = ["rootfilespec>=0.0.3"]
 
 [project.urls]
 Homepage = "https://github.com/robjectifier/rhydrator"
