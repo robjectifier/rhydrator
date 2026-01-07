@@ -18,6 +18,7 @@ DIR = Path(__file__).parent.resolve()
 PROJECT = nox.project.load_toml()
 
 nox.needs_version = ">=2025.2.9"
+nox.options.sessions = ["lint", "tests"]
 nox.options.default_venv_backend = "uv|virtualenv"
 
 

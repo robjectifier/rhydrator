@@ -1,3 +1,4 @@
+classes.py
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -186,3 +187,10 @@ Thumbs.db
 # Common editor files
 *~
 *.swp
+.vscode
+
+debug.py
+
+# uv
+
+uv.lock
