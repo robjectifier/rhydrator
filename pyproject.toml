@@ -30,7 +30,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = []
+dependencies = ["rootfilespec"]
 
 [project.urls]
 Homepage = "https://github.com/robjectifier/rhydrator"
@@ -43,6 +43,7 @@ Changelog = "https://github.com/robjectifier/rhydrator/releases"
 test = [
   "pytest >=9",
   "pytest-cov >=7",
+  "scikit-hep-testdata",
 ]
 dev = [
   { include-group = "test" },
