@@ -129,17 +129,15 @@ class ProfileBulder:
                 raise ValueError(msg)
             if stack:
                 # always close frames down to common ancestor
-                # and always close the last frame (last span must have ended)
-                icommon = (
-                    max(
-                        i
-                        for i, (left, right) in enumerate(
-                            zip(stack, span["stack"][:-1], strict=False)
-                        )
-                        if left == right
+                common = [
+                    i
+                    for i, (left, right) in enumerate(
+                        zip(stack, span["stack"], strict=False)
                     )
-                    + 1
-                )
+                    if left != right
+                ]
+                # and always close the last frame (last span must have ended)
+                icommon = min(common) if common else len(stack) - 1
                 stack, closing = stack[:icommon], stack[icommon:]
                 events.extend(
                     {"type": "C", "frame": frame, "at": last_span_end}
@@ -343,11 +341,12 @@ def read(path: Path):
                 # ple.pageLocations is [cluster][column][page]
                 for clusterId, pc in enumerate(ple.pageLocations):
                     for columnId, pl in enumerate(pc):
-                        # columnPages[columnId].extend(pl)
                         for page in pl:
                             tup = (page.locator.offset, page.locator.size)  # type: ignore[attr-defined]
                             if tup in seen_pages:
                                 continue
+                            seen_pages.add(tup)
+                            # page2column[tup].add(columnId)
                             columnPages[columnId].append(
                                 {
                                     "cluster": clusterId,
@@ -355,8 +354,6 @@ def read(path: Path):
                                     "size": page.locator.size,
                                 }
                             )
-                            seen_pages.add(tup)
-                            # page2column[tup].add(columnId)
 
             # for page, columns in page2column.items():
             #     if len(columns) > 1:
