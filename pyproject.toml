@@ -38,6 +38,8 @@ Homepage = "https://github.com/robjectifier/rhydrator"
 Discussions = "https://github.com/robjectifier/rhydrator/discussions"
 Changelog = "https://github.com/robjectifier/rhydrator/releases"
 
+[project.scripts]
+rlayoutviz = "rhydrator.layoutviz:main"
 
 [dependency-groups]
 test = [
