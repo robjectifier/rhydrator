@@ -352,7 +352,7 @@ def read(path: Path):
 
             columnPages: defaultdict[int, list[PageData]] = defaultdict(list)
             seen_pages: set[tuple[int, int]] = set()
-            # page2column: defaultdict[tuple[int, int], set[int]] = defaultdict(set)
+            page2column: defaultdict[tuple[int, int, int], set[int]] = defaultdict(set)
 
             for ple in rntuple.pagelistEnvelopes:
                 # ple.pageLocations is [cluster][column][page]
@@ -360,10 +360,10 @@ def read(path: Path):
                     for columnId, pl in enumerate(pc):
                         for page in pl:
                             tup = (page.locator.offset, page.locator.size)  # type: ignore[attr-defined]
+                            page2column[tup[0], tup[1], clusterId].add(columnId)
                             if tup in seen_pages:
                                 continue
                             seen_pages.add(tup)
-                            # page2column[tup].add(columnId)
                             columnPages[columnId].append(
                                 {
                                     "cluster": clusterId,
@@ -376,7 +376,7 @@ def read(path: Path):
             # for page, columns in page2column.items():
             #     if len(columns) > 1:
             #         print(
-            #             f"Page at offset {page[0]} size {page[1]} belongs to multiple columns: {columns}"
+            #             f"Page in cluster {page[2]} at offset {page[0]} size {page[1]} belongs to multiple columns: {columns}"
             #         )
 
             fieldColumns: FieldColumnMap = defaultdict(list)
