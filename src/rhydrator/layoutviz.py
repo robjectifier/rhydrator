@@ -23,6 +23,7 @@ class PageData(TypedDict):
     cluster: int
     offset: int
     size: int
+    elements: int
 
 
 class ColumnData(TypedDict):
@@ -64,7 +65,7 @@ class ProfileBulder:
     "All byte range spans in the file"
     stack: list[int] = field(default_factory=list)
     "Current stack of frame indices"
-    shared_frames: dict[str, int] = field(default_factory=dict)
+    shared_frames: dict[tuple[str, str | None], int] = field(default_factory=dict)
     "Frames where the name is treated as unique symbol identifier"
 
     def push_frame(self, frame: Frame):
@@ -74,21 +75,22 @@ class ProfileBulder:
     def pop_frame(self):
         self.stack.pop()
 
-    def push_shared_frame(self, name: str):
-        self.stack.append(self.shared_frame_id(name))
+    def push_shared_frame(self, name: str, file: str | None = None):
+        self.stack.append(self.shared_frame_id(name, file))
 
-    def shared_frame_id(self, name: str) -> int:
+    def shared_frame_id(self, name: str, file: str | None) -> int:
         """Get or create a frame ID for the given shared frame"""
-        if name not in self.shared_frames:
+        key = (name, file)
+        if key not in self.shared_frames:
             frame: Frame = {
                 "name": name,
-                "file": None,
+                "file": file,
                 "line": None,
                 "col": None,
             }
             self.frames.append(frame)
-            self.shared_frames[name] = len(self.frames) - 1
-        return self.shared_frames[name]
+            self.shared_frames[key] = len(self.frames) - 1
+        return self.shared_frames[key]
 
     def add_span(self, name: str, offset: int, size: int):
         """Add a span of bytes in the file to the profile
@@ -119,6 +121,7 @@ class ProfileBulder:
 
         stack: list[int] = []
         last_span_end = 0
+        gaps: list[tuple[int, int]] = []
         for span in sorted(self.spans, key=lambda s: s["offset"]):
             if span["offset"] < last_span_end:
                 msg = f"Overlapping spans detected: {span=} starts before last span ended at {last_span_end}"
@@ -127,6 +130,8 @@ class ProfileBulder:
                 cstack = " > ".join(repr(self.frames[frame]) for frame in stack)
                 msg += f"\nCurrent stack: {cstack}"
                 raise ValueError(msg)
+            if span["offset"] > last_span_end:
+                gaps.append((last_span_end, span["offset"] - last_span_end))
             if stack:
                 # always close frames down to common ancestor
                 common = [
@@ -156,6 +161,9 @@ class ProfileBulder:
             {"type": "C", "frame": frame, "at": last_span_end}
             for frame in reversed(stack)
         )
+
+        # most of these will be the 8-byte checksums after each envelope
+        # print(f"Detected {len(gaps)} gaps in file layout totaling {sum(size for _, size in gaps)} of {endValue} bytes")
 
         opened, closed = 0, 0
         offset = 0
@@ -188,6 +196,10 @@ class ProfileBulder:
         }
 
 
+UNIQUE_FIELDS = False
+UNIQUE_COLUMNS = False
+
+
 def descend(
     profile: ProfileBulder,
     schema: SchemaDescription,
@@ -199,28 +211,34 @@ def descend(
     if fieldDescription.fFlags & 0x2:
         # skip projected fields
         return
-    profile.push_frame(
-        {
-            "name": f"Field {fieldID}: {fieldDescription.fFieldName.fString.decode()}",
-            "file": f"{fieldDescription.fTypeName.fString.decode()}",
-            "line": None,
-            "col": None,
-        },
-    )
+    field_name = fieldDescription.fFieldName.fString.decode()
+    field_type = fieldDescription.fTypeName.fString.decode()
+    if UNIQUE_FIELDS:
+        profile.push_frame(
+            {
+                "name": f"Field {fieldID}: {field_name}",
+                "file": f"{field_type}",
+                "line": None,
+                "col": None,
+            },
+        )
+    else:
+        profile.push_shared_frame(field_name, field_type)
     for column in fieldColumns.get(fieldID, []):
-        # if we want columns to be unique frames, we can do this:
-        # profile.push_frame(
-        #     {
-        #         "name": f"Column {column['id']}: {column['type']}",
-        #         "file": None,
-        #         "line": None,
-        #         "col": None,
-        #     },
-        # )
-        profile.push_shared_frame(f"Column {column['type']}")
+        if UNIQUE_COLUMNS:
+            profile.push_frame(
+                {
+                    "name": f"Column {column['id']}: {column['type']}",
+                    "file": None,
+                    "line": None,
+                    "col": None,
+                },
+            )
+        else:
+            profile.push_shared_frame(f"Column {column['type']}")
         for page in column["pages"]:
             profile.add_span(
-                f"Page (cluster {page['cluster']})",
+                "Page",  # (cluster {page['cluster']})
                 offset=page["offset"],
                 size=page["size"],
             )
@@ -288,7 +306,6 @@ def read(path: Path):
 
         #### Get RNTuple Info
         # Only RNTuple Anchor TKeys are visible (i.e. in TKeyList); ClassName = ROOT::RNTuple
-        # anchor_keylist = [key for key in keylist.values() if key.fClassName.fString == b'ROOT::RNTuple']
         for name, tkey in keylist.items():
             profile.add_span(
                 f"{name}: {tkey.fClassName.fString.decode()}",
@@ -352,6 +369,7 @@ def read(path: Path):
                                     "cluster": clusterId,
                                     "offset": page.locator.offset,  # type: ignore[attr-defined]
                                     "size": page.locator.size,
+                                    "elements": page.fNElements,
                                 }
                             )
 
@@ -373,6 +391,20 @@ def read(path: Path):
                         "pages": columnPages.get(columnId, []),
                     }
                 )
+
+            pagedata = []
+            for columnId, columnDescription in enumerate(
+                schemaDescription.columnDescriptions
+            ):
+                ctype = repr(columnDescription.fColumnType).removeprefix("ColumnType.")
+                pagedata.extend(
+                    (ctype, page["size"], page["elements"])
+                    for page in columnPages.get(columnId, [])
+                )
+            with Path(f"pagedata_{name}.csv").open("w") as pagedatafile:
+                pagedatafile.write("ColumnType,PageSize,NumElements\n")
+                for ctype, size, elements in pagedata:
+                    pagedatafile.write(f"{ctype},{size},{elements}\n")
 
             topLevelFields = [
                 fieldID
