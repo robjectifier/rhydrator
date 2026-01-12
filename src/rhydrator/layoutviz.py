@@ -392,7 +392,7 @@ def read(path: Path):
                     }
                 )
 
-            pagedata = []
+            pagedata: list[tuple[str, int, int]] = []
             for columnId, columnDescription in enumerate(
                 schemaDescription.columnDescriptions
             ):
