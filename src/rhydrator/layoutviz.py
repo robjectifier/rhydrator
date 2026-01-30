@@ -10,6 +10,7 @@ import gzip
 import json
 from collections import defaultdict
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
 from typing import Literal, TypeAlias, TypedDict
 
@@ -350,47 +351,27 @@ def read(path: Path):
 
             schemaDescription = rntuple.schemaDescription
 
-            columnPages: defaultdict[int, list[PageData]] = defaultdict(list)
+            clusters: list[dict[int, list[PageData]]] = []
             seen_pages: set[tuple[int, int]] = set()
-            page2column: defaultdict[tuple[int, int, int], set[int]] = defaultdict(set)
 
             for ple in rntuple.pagelistEnvelopes:
                 # ple.pageLocations is [cluster][column][page]
-                for clusterId, pc in enumerate(ple.pageLocations):
+                for pc in ple.pageLocations:
+                    columnPages: defaultdict[int, list[PageData]] = defaultdict(list)
                     for columnId, pl in enumerate(pc):
                         for page in pl:
                             tup = (page.locator.offset, page.locator.size)  # type: ignore[attr-defined]
-                            page2column[tup[0], tup[1], clusterId].add(columnId)
                             if tup in seen_pages:
                                 continue
                             seen_pages.add(tup)
                             columnPages[columnId].append(
                                 {
-                                    "cluster": clusterId,
                                     "offset": page.locator.offset,  # type: ignore[attr-defined]
                                     "size": page.locator.size,
                                     "elements": page.fNElements,
                                 }
                             )
-
-            # for page, columns in page2column.items():
-            #     if len(columns) > 1:
-            #         print(
-            #             f"Page in cluster {page[2]} at offset {page[0]} size {page[1]} belongs to multiple columns: {columns}"
-            #         )
-
-            fieldColumns: FieldColumnMap = defaultdict(list)
-            for columnId, columnDescription in enumerate(
-                schemaDescription.columnDescriptions
-            ):
-                ctype = repr(columnDescription.fColumnType).removeprefix("ColumnType.")
-                fieldColumns[columnDescription.fFieldID].append(
-                    {
-                        "id": columnId,
-                        "type": ctype,
-                        "pages": columnPages.get(columnId, []),
-                    }
-                )
+                    clusters.append(columnPages)
 
             pagedata: list[tuple[str, int, int]] = []
             for columnId, columnDescription in enumerate(
@@ -399,6 +380,7 @@ def read(path: Path):
                 ctype = repr(columnDescription.fColumnType).removeprefix("ColumnType.")
                 pagedata.extend(
                     (ctype, page["size"], page["elements"])
+                    for columnPages in clusters
                     for page in columnPages.get(columnId, [])
                 )
             with Path(f"pagedata_{name}.csv").open("w") as pagedatafile:
@@ -413,12 +395,38 @@ def read(path: Path):
                 )
                 if fieldDescription.fParentFieldID == fieldID
             ]
-            for fieldID in topLevelFields:
-                descend(profile, schemaDescription, fieldColumns, fieldID)
-            profile.pop_frame()
+
+            for pages in clusters:
+                profile.push_frame(
+                    {
+                        "name": "Cluster",
+                        "file": None,
+                        "line": None,
+                        "col": None,
+                    }
+                )
+                fieldColumns: FieldColumnMap = defaultdict(list)
+                for columnId, columnDescription in enumerate(
+                    schemaDescription.columnDescriptions
+                ):
+                    ctype = repr(columnDescription.fColumnType).removeprefix(
+                        "ColumnType."
+                    )
+                    fieldColumns[columnDescription.fFieldID].append(
+                        {
+                            "id": columnId,
+                            "type": ctype,
+                            "pages": pages.get(columnId, []),
+                        }
+                    )
+
+                for fieldID in topLevelFields:
+                    descend(profile, schemaDescription, fieldColumns, fieldID)
+                profile.pop_frame()  # Cluster
+            profile.pop_frame()  # RNTuple
 
         profile.pop_frame()
-        filehandle.seek(0, 2)
+        filehandle.seek(0, os.SEEK_END)
         file_size = filehandle.tell()
 
     out = profile.render(endValue=file_size)
