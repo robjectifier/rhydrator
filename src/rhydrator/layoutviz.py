@@ -397,14 +397,7 @@ def read(path: Path):
             ]
 
             for pages in clusters:
-                profile.push_frame(
-                    {
-                        "name": "Cluster",
-                        "file": None,
-                        "line": None,
-                        "col": None,
-                    }
-                )
+                profile.push_shared_frame("Cluster")
                 fieldColumns: FieldColumnMap = defaultdict(list)
                 for columnId, columnDescription in enumerate(
                     schemaDescription.columnDescriptions
