@@ -8,9 +8,9 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import os
 from collections import defaultdict
 from dataclasses import dataclass, field
-import os
 from pathlib import Path
 from typing import Literal, TypeAlias, TypedDict
 
@@ -59,14 +59,27 @@ class Span(TypedDict):
 
 
 @dataclass
+class Config:
+    """Configuration for layout visualization"""
+
+    unique_fields: bool = False
+    unique_columns: bool = False
+    unique_clusters: bool = False
+
+
+@dataclass
 class ProfileBulder:
+    config: Config
+    """Configuration for the profile (used in frame naming)"""
     frames: list[Frame] = field(default_factory=list)
     "All frames in the profile"
     spans: list[Span] = field(default_factory=list)
     "All byte range spans in the file"
     stack: list[int] = field(default_factory=list)
     "Current stack of frame indices"
-    shared_frames: dict[tuple[str, str | None], int] = field(default_factory=dict)
+    shared_frames: dict[tuple[str, str | None, int | None, int | None], int] = field(
+        default_factory=dict
+    )
     "Frames where the name is treated as unique symbol identifier"
 
     def push_frame(self, frame: Frame):
@@ -76,18 +89,27 @@ class ProfileBulder:
     def pop_frame(self):
         self.stack.pop()
 
-    def push_shared_frame(self, name: str, file: str | None = None):
-        self.stack.append(self.shared_frame_id(name, file))
+    def push_shared_frame(
+        self,
+        name: str,
+        *,
+        file: str | None = None,
+        line: int | None = None,
+        col: int | None = None,
+    ):
+        self.stack.append(self.shared_frame_id(name, file=file, line=line, col=col))
 
-    def shared_frame_id(self, name: str, file: str | None) -> int:
+    def shared_frame_id(
+        self, name: str, *, file: str | None, line: int | None, col: int | None
+    ) -> int:
         """Get or create a frame ID for the given shared frame"""
-        key = (name, file)
+        key = (name, file, line, col)
         if key not in self.shared_frames:
             frame: Frame = {
                 "name": name,
                 "file": file,
-                "line": None,
-                "col": None,
+                "line": line,
+                "col": col,
             }
             self.frames.append(frame)
             self.shared_frames[key] = len(self.frames) - 1
@@ -197,10 +219,6 @@ class ProfileBulder:
         }
 
 
-UNIQUE_FIELDS = False
-UNIQUE_COLUMNS = False
-
-
 def descend(
     profile: ProfileBulder,
     schema: SchemaDescription,
@@ -214,7 +232,7 @@ def descend(
         return
     field_name = fieldDescription.fFieldName.fString.decode()
     field_type = fieldDescription.fTypeName.fString.decode()
-    if UNIQUE_FIELDS:
+    if profile.config.unique_fields:
         profile.push_frame(
             {
                 "name": f"Field {fieldID}: {field_name}",
@@ -224,9 +242,9 @@ def descend(
             },
         )
     else:
-        profile.push_shared_frame(field_name, field_type)
+        profile.push_shared_frame(field_name, file=field_type)
     for column in fieldColumns.get(fieldID, []):
-        if UNIQUE_COLUMNS:
+        if profile.config.unique_columns:
             profile.push_frame(
                 {
                     "name": f"Column {column['id']}: {column['type']}",
@@ -252,8 +270,8 @@ def descend(
     profile.pop_frame()
 
 
-def read(path: Path):
-    profile = ProfileBulder()
+def read(path: Path, config: Config):
+    profile = ProfileBulder(config=config)
     profile.push_frame(
         {
             "name": str(path),
@@ -396,8 +414,11 @@ def read(path: Path):
                 if fieldDescription.fParentFieldID == fieldID
             ]
 
-            for pages in clusters:
-                profile.push_shared_frame("Cluster")
+            for clusterId, pages in enumerate(clusters):
+                if profile.config.unique_clusters:
+                    profile.push_shared_frame(f"Cluster {clusterId}")
+                else:
+                    profile.push_shared_frame("Cluster")
                 fieldColumns: FieldColumnMap = defaultdict(list)
                 for columnId, columnDescription in enumerate(
                     schemaDescription.columnDescriptions
@@ -434,5 +455,25 @@ def main():
     parser.add_argument(
         "filename", type=Path, help="Path to the ROOT file to visualize"
     )
+    parser.add_argument(
+        "--unique-fields",
+        action="store_true",
+        help="Treat field names as unique identifiers in the profile",
+    )
+    parser.add_argument(
+        "--unique-columns",
+        action="store_true",
+        help="Treat column names as unique identifiers in the profile",
+    )
+    parser.add_argument(
+        "--unique-clusters",
+        action="store_true",
+        help="Treat cluster ids as unique identifiers in the profile",
+    )
     args = parser.parse_args()
-    read(args.filename)
+    config = Config(
+        unique_fields=args.unique_fields,
+        unique_columns=args.unique_columns,
+        unique_clusters=args.unique_clusters,
+    )
+    read(args.filename, config)
