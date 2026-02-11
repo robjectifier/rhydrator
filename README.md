@@ -29,3 +29,8 @@
 [coverage-link]:            https://codecov.io/github/robjectifier/rhydrator
 
 <!-- prettier-ignore-end -->
+
+RHydrator is a Python library for (de)hydrating ROOT RNTuple files and storing the metadata in a relational database.
+The metadata is organized as shown:
+
+[![ER Diagram](docs/robjectifier.png)]
