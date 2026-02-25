@@ -41,6 +41,7 @@ def db_session():
         yield session
 
     # Cleanup
+    engine.dispose()
     db_path.unlink(missing_ok=True)
 
 
