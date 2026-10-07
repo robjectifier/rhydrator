@@ -1,7 +1,8 @@
 """The RNTuple files the tests read, from one place (#8).
 
-- root-io-spec's RNTuple fixtures, vendored in ``tests/data/root-io-spec/``.
-  They are part of the repository, so a missing one fails the test.
+- root-io-spec's RNTuple fixtures, from the submodule ``reference/root-io-spec``
+  (pinned at d1618ad). The submodule is part of the repository, so a missing
+  file fails the test.
 
 Test modules take these through the fixtures below. ``test_fixtures.py`` also
 imports the plain functions, to test them directly.
@@ -13,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-ROOT_IO_SPEC_DIR = Path(__file__).parent / "data" / "root-io-spec"
-"""root-io-spec's files, vendored at commit d1618ad (see the README there)."""
+ROOT_IO_SPEC_DIR = Path(__file__).parent.parent / "reference" / "root-io-spec"
+"""The root-io-spec submodule's checkout."""
 
 ROOT_IO_SPEC_FILES: tuple[str, ...] = (
     "anchor.root",
@@ -33,14 +34,15 @@ ROOT_IO_SPEC_FILES: tuple[str, ...] = (
 
 
 def root_io_spec_path(name: str) -> Path:
-    """Return the path of the vendored root-io-spec fixture called *name*.
+    """Return the path of root-io-spec's fixture called *name*.
 
     *name* is a file name such as ``"anchor.root"``; the file lives in
     ``data/rntuple/`` under ``ROOT_IO_SPEC_DIR``.
 
-    The files are committed with the tests, so a missing one means the
-    repository is broken: fail the calling test with ``pytest.fail``, with a
-    message that names the missing path. Never skip.
+    The submodule is part of the repository, so a missing file means the
+    checkout is incomplete: fail the calling test with ``pytest.fail``, with a
+    message that names the missing path and says how to fetch it
+    (``git submodule update --init reference/root-io-spec``). Never skip.
     """
     raise NotImplementedError
 

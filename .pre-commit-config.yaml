@@ -3,9 +3,7 @@ ci:
   autofix_commit_msg: "style: pre-commit fixes"
   autoupdate_schedule: "monthly"
 
-# tests/data/root-io-spec/ is vendored byte for byte: no hook may rewrite it
-# (its README.md is ours and is checked).
-exclude: ^(\.cruft\.json|\.copier-answers\.yml|tests/data/root-io-spec/(LICENSE|data/.*|gen/.*))$
+exclude: ^.cruft.json|.copier-answers.yml$
 
 repos:
   - repo: https://github.com/adamchainz/blacken-docs

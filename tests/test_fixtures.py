@@ -22,7 +22,7 @@ ROOT_IO_SPEC_SIZES = {
     "untyped.root": 2838,
     "user-class.root": 6009,
 }
-"""Sizes in bytes of the files as vendored from root-io-spec d1618ad."""
+"""Sizes in bytes of the files at root-io-spec d1618ad."""
 
 
 def test_root_io_spec_lists_every_pinned_file():
@@ -50,15 +50,6 @@ def test_root_io_spec_missing_file_fails():
     # pytest.skip.Exception instead, and this test would fail.
     with pytest.raises(pytest.fail.Exception, match=r"no-such-file\.root"):
         root_io_spec_path("no-such-file.root")
-
-
-def test_root_io_spec_licence_and_commit_recorded():
-    assert (
-        (ROOT_IO_SPEC_DIR / "LICENSE")
-        .read_text(encoding="utf-8")
-        .startswith("BSD 3-Clause License")
-    )
-    assert "d1618ad" in (ROOT_IO_SPEC_DIR / "README.md").read_text(encoding="utf-8")
 
 
 def test_root_io_spec_case_toml_beside_each_file():
