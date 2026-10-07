@@ -1,0 +1,443 @@
+id   = "rntuple/anchor"
+file = "data/rntuple/anchor.root"
+
+# No `size`: 2592 bytes when libc++ wrote it and 2620 when libstdc++ did, for
+# the reason `digest_reason` below gives. Every offset the assertions use is at
+# or below 870, well before the StreamerInfo record where the two diverge.
+
+description = """
+The first RNTuple fixture in this project: an anchor, a header envelope and a
+footer envelope written by the pinned ROOT.
+
+`spec/05-rntuple/` tracks ROOT's own specification rather than restating it, so
+this case serves the audit rather than the format. It pins the bytes that ERRATA
+1, 2, 3 and 5 are about, on 6.40.04. Before this case, every byte in those
+errata came from `RNTuple.root` in the CERN corpus: one file, written by ROOT
+6.35/01, which is older than the pinned release and has an older format version
+(`Version Minor` 0 there, 2 here).
+
+Compression is off, which is not RNTuple's default (zstd), so the envelopes are
+readable in place and every assertion below is about the format rather than a
+codec.
+
+**ERRATUM 1.** The anchor stamps epoch 1, major 0, minor 2, patch 0 --
+`1.0.2.0` -- where the document is titled `1.0.2.1`. This is now confirmed on
+the pinned release rather than inferred from `RNTuple.hxx`.
+
+**ERRATUM 2.** The payload begins `40 00 00 42 00 02`: a byte count of 66 and
+`ROOT::RNTuple`'s class version 2, six bytes that the document's anchor schema
+does not show. `Version Epoch` is at offset 1058, not 1052.
+
+**ERRATUM 3.** The byte count puts the end of the object at 1122; the payload
+ends at 1130. The eight bytes in between are the XXH3 checksum, which is
+therefore outside the byte count. The assertions check 1122 and 1130 together.
+
+**ERRATUM 5.** The header envelope's first eight bytes are
+`01 00 f0 00 00 00 00 00`: little-endian, type `0x0001` in the low 16 bits and
+length `0xf0` = 240 in the upper 48. The 240 covers the whole envelope
+including the trailing checksum, and equals the anchor's `Len Header`. The
+checksum occupies 500..508, and the envelope ends at 508.
+
+The footer's *Header checksum* field at 854 holds `2a 13 a2 84 b3 59 d3 dd`, the
+same bytes as the header envelope's own checksum at 500. That is what the
+document says the field is for; nothing else in the file states the relation.
+
+The header envelope's contents are asserted too, since decoding them from the
+document alone is the only way to confirm the document describes them: two
+field record frames (`x`/`float`, `n`/`std::int32_t`), two column record frames
+of type 0x0C Real32 and 0x07 Int32, and the two empty list frames that follow.
+The list frames' sizes are negative int64 (`-111`, `-52`, `-12`, `-12`), which
+is how a list frame is told from a record frame. RNTuple strings are a `u32`
+length followed by bytes, not the counted string of Conventions 5.1.
+
+Everything in this file is little-endian except the anchor, which is a TKey
+payload and big-endian. The boundary is the anchor's last byte.
+"""
+
+spec = [
+  "spec/05-rntuple/ERRATA.md",
+  "spec/05-rntuple/NOTES.md",
+]
+
+root_version = "6.40.04"
+compression  = { algorithm = "none", setting = 0 }
+
+# This file cannot have a portable normalized digest. `ROOT::RNTuple` declares
+# its seek and length members as `std::uint64_t`, and that typedef resolves to
+# `unsigned long long` with libc++ and `unsigned long` with libstdc++ -- so the
+# streamer info records `fType` 17 (kULong64) with the type name `ULong64_t` on
+# one and `fType` 14 (kULong) with `unsigned long` on the other. Seven members,
+# four characters of type name each, make the 28-byte difference. A mask can
+# restore a value but not a length.
+#
+# The bytes on disk are identical either way, since codes 14 and 17 are both
+# eight bytes (ElementTypes.md 2); that is recorded there as section 2.4.
+# PLAN.md 9.6.
+digest        = false
+digest_reason = """
+`std::uint64_t` resolves to `unsigned long long` with libc++ and `unsigned long`
+with libstdc++, so ROOT::RNTuple's seven 64-bit members are recorded as fType 17
+`ULong64_t` on one and fType 14 `unsigned long` on the other: a 28-byte length
+difference a mask cannot undo. The bytes they describe are identical. The 50
+byte assertions still run. ElementTypes.md 2.4, PLAN.md 9.6
+"""
+
+[[records]]
+offset = 100
+nbytes = 126
+class  = "TFile"
+role   = "the root directory record"
+[[records]]
+offset = 226
+nbytes = 282
+class  = "RBlob"
+role   = "the header envelope"
+[[records]]
+offset = 508
+nbytes = 82
+class  = "RBlob"
+role   = "a page"
+[[records]]
+offset = 590
+nbytes = 206
+class  = "RBlob"
+role   = "the page list envelope"
+[[records]]
+offset = 796
+nbytes = 202
+class  = "RBlob"
+role   = "the footer envelope"
+[[records]]
+offset = 998
+nbytes = 132
+class  = "ROOT::RNTuple"
+role   = "the anchor"
+[[records]]
+offset = 1236
+nbytes = 1298
+class  = "TList"
+role   = "StreamerInfo"
+
+# --- the anchor: ERRATA 1, 2, 3 -------------------------------------------
+#
+# 40 00 00 42 | 00 02 | 00 01 00 00 00 02 00 00 | ...
+# byte count    clsver  epoch major minor patch
+# ^ the document's schema starts six bytes later, at `epoch`.
+
+[[bytes]]
+name = "ERRATUM 2: a byte count the anchor schema does not show"
+offset = 1052
+type = "u32"
+value = 0x40000042
+
+[[bytes]]
+name = "ERRATUM 2: and ROOT::RNTuple's class version 2, which is not the format version"
+offset = 1056
+type = "u16"
+value = 2
+
+[[bytes]]
+name = "ERRATUM 1: Version Epoch -- the document's schema thinks this is offset 1052"
+offset = 1058
+type = "u16"
+value = 1
+
+[[bytes]]
+name = "ERRATUM 1: Version Major"
+offset = 1060
+type = "u16"
+value = 0
+
+[[bytes]]
+name = "ERRATUM 1: Version Minor -- 2 here, 0 in the ROOT 6.35 file the errata were written from"
+offset = 1062
+type = "u16"
+value = 2
+
+[[bytes]]
+name = "ERRATUM 1: Version Patch is 0, so this file says 1.0.2.0 and the document says 1.0.2.1"
+offset = 1064
+type = "u16"
+value = 0
+
+[[bytes]]
+name = "Seek Header: the payload of the RBlob at 226, whose key is 42 bytes"
+offset = 1066
+type = "u64"
+value = 268
+
+[[bytes]]
+name = "Nbytes Header"
+offset = 1074
+type = "u64"
+value = 240
+
+[[bytes]]
+name = "Len Header equals Nbytes Header, so the header envelope is stored uncompressed"
+offset = 1082
+type = "u64"
+value = 240
+
+[[bytes]]
+name = "Seek Footer"
+offset = 1090
+type = "u64"
+value = 838
+
+[[bytes]]
+name = "Len Footer"
+offset = 1106
+type = "u64"
+value = 160
+
+[[bytes]]
+name = "Max Key Size is 1 GiB, the TKey limit the document names"
+offset = 1114
+type = "u64"
+value = 1073741824
+
+# ERRATUM 3: the byte count of 66 puts the end of the object at 1052 + 4 + 66 =
+# 1122. The record's payload ends at 1130. The eight bytes between are the
+# checksum, and they are outside the byte count.
+
+[[bytes]]
+name = "ERRATUM 3: the last field ends at 1122, where the byte count says the object does"
+offset = 1118
+type = "u32"
+value = 0x40000000
+
+[[bytes]]
+name = "ERRATUM 3: and eight more bytes of checksum follow it, outside the byte count"
+offset = 1122
+type = "bytes"
+value = [0x7d, 0xd5, 0xf1, 0x10, 0xd7, 0x4d, 0x87, 0x56]
+
+# --- the header envelope: ERRATUM 5 ---------------------------------------
+#
+# 01 00 f0 00 00 00 00 00   little-endian: type in bits 0:15, length in 16:63
+
+[[bytes]]
+name = "ERRATUM 5: the envelope preamble, type 1 in the low 16 bits"
+offset = 268
+type = "bytes"
+value = [0x01, 0x00, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00]
+
+[[bytes]]
+name = "feature flags: zero, and the top bit clear so no second word follows"
+offset = 276
+type = "u64le"
+value = 0
+
+[[bytes]]
+name = "the ntuple name: a u32 length, NOT a counted string"
+offset = 284
+type = "bytes"
+value = [0x04, 0x00, 0x00, 0x00]
+
+[[bytes]]
+name = "then its four bytes"
+offset = 288
+type = "bytes"
+value = "ntpl"
+
+[[bytes]]
+name = "the description is the empty string: a length of 0 and nothing else"
+offset = 292
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "the writer identifier's length"
+offset = 296
+type = "u32le"
+value = 13
+
+[[bytes]]
+name = "and its text, which names the release that wrote the file"
+offset = 300
+type = "bytes"
+value = "ROOT v6.40.04"
+
+# --- the field list frame -------------------------------------------------
+#
+# A list frame's size is NEGATIVE. -111 spans 313..424.
+
+[[bytes]]
+name = "the field list frame: a negative int64, which is what makes it a list frame"
+offset = 313
+type = "i64le"
+value = -111
+
+[[bytes]]
+name = "two fields"
+offset = 321
+type = "u32le"
+value = 2
+
+[[bytes]]
+name = "field 0 is a RECORD frame, so its size is positive"
+offset = 325
+type = "i64le"
+value = 46
+
+[[bytes]]
+name = "field 0: structural role 0, a plain field"
+offset = 345
+type = "u16le"
+value = 0
+
+[[bytes]]
+name = "field 0: flags 0"
+offset = 347
+type = "u16le"
+value = 0
+
+[[bytes]]
+name = "field 0: the field name, one byte"
+offset = 349
+type = "bytes"
+value = [0x01, 0x00, 0x00, 0x00, 0x78]
+
+[[bytes]]
+name = "field 0: the type name"
+offset = 354
+type = "bytes"
+value = [0x05, 0x00, 0x00, 0x00]
+
+[[bytes]]
+name = "field 0: which is float"
+offset = 358
+type = "bytes"
+value = "float"
+
+[[bytes]]
+name = "field 1 begins where field 0's record frame ends, at 371"
+offset = 371
+type = "i64le"
+value = 53
+
+[[bytes]]
+name = "field 1: its parent field ID is its own ID -- a top-level field points at itself"
+offset = 387
+type = "u32le"
+value = 1
+
+[[bytes]]
+name = "field 1: the type name is spelled std::int32_t, not int"
+offset = 404
+type = "bytes"
+value = "std::int32_t"
+
+# --- the column list frame ------------------------------------------------
+
+[[bytes]]
+name = "the column list frame, also negative"
+offset = 424
+type = "i64le"
+value = -52
+
+[[bytes]]
+name = "two columns"
+offset = 432
+type = "u32le"
+value = 2
+
+[[bytes]]
+name = "column 0: a record frame of 20"
+offset = 436
+type = "i64le"
+value = 20
+
+[[bytes]]
+name = "column 0: type 0x0C, Real32 -- the column type table, against bytes"
+offset = 444
+type = "u16le"
+value = 0x000c
+
+[[bytes]]
+name = "column 0: 32 bits on storage, as that table's second column says"
+offset = 446
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "column 0: attached to field 0"
+offset = 448
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "column 1: type 0x07, Int32"
+offset = 464
+type = "u16le"
+value = 0x0007
+
+[[bytes]]
+name = "column 1: 32 bits"
+offset = 466
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "column 1: attached to field 1"
+offset = 468
+type = "u32le"
+value = 1
+
+# --- the two empty list frames, and the checksum --------------------------
+
+[[bytes]]
+name = "alias columns: an empty list frame is twelve bytes, not zero"
+offset = 476
+type = "i64le"
+value = -12
+
+[[bytes]]
+name = "with a count of 0"
+offset = 484
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "extra type information: the same"
+offset = 488
+type = "i64le"
+value = -12
+
+[[bytes]]
+name = "ERRATUM 5: the checksum sits INSIDE the envelope's declared length of 240"
+offset = 500
+type = "bytes"
+value = [0x2a, 0x13, 0xa2, 0x84, 0xb3, 0x59, 0xd3, 0xdd]
+
+# --- the footer envelope --------------------------------------------------
+
+[[bytes]]
+name = "the footer preamble: type 2, length 160"
+offset = 838
+type = "bytes"
+value = [0x02, 0x00, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00]
+
+[[bytes]]
+name = "the footer's feature flags"
+offset = 846
+type = "u64le"
+value = 0
+
+[[bytes]]
+name = "the footer's Header checksum field is the header envelope's own checksum"
+offset = 854
+type = "bytes"
+value = [0x2a, 0x13, 0xa2, 0x84, 0xb3, 0x59, 0xd3, 0xdd]
+
+[[bytes]]
+name = "the schema extension is a record frame of 56 holding four empty list frames"
+offset = 862
+type = "i64le"
+value = 56
+
+[[bytes]]
+name = "the first of them"
+offset = 870
+type = "i64le"
+value = -12

@@ -1,0 +1,605 @@
+id   = "rntuple/attributes"
+file = "data/rntuple/attributes.root"
+
+# No `size`: the StreamerInfo record is the last one in the file and is 28 bytes
+# longer with libstdc++, for the reason `digest_reason` below gives. gen.C holds
+# it back until the end so that every offset asserted here, all below 4153, is
+# the same on both platforms; left alone, ROOT writes it at the first attribute
+# set's commit, in the middle of the file, and everything after it would move.
+
+description = """
+Linked attribute sets: two attribute set RNTuples linked from the footer of a main
+RNTuple. This is the fixture for the audit of *Linked Attribute Sets* and
+*Linked Attribute Set Record Frame* in the tracked copy; before it, no fixture had
+a non-empty attribute set list.
+
+The main RNTuple `ntpl` has one `float` field `x` and six entries. Two sets:
+
+| Set | User fields | Entries (`_rangeStart`, `_rangeLen`) | Values |
+|---|---|---|---|
+| `runs` | `run` (`std::int32_t`), `weight` (`float`) | (0, 3), (3, 3) | run 1, 2; weight 0.25, 0.75 |
+| `flags` | `flag` (`std::uint16_t`) | (3, **0**), (1, 4) | 7, 9 |
+
+Each set is an RNTuple of its own, with header, pages, page list, footer and
+anchor, as the document says. What the bytes show:
+
+- **The footer's last list frame** at 3824 has two record frames, of 36 and 37
+  bytes: `Schema Version Major` 1 and `Minor` 0 as two `u16`, the anchor length as
+  a `u32`, a simple locator, and the name as an RNTuple string, in the order the
+  document's diagram and sentence give.
+- **The anchor length is 78**, which is the whole anchor object: the byte count
+  and class version the anchor schema omits (ERRATA 2), the schema's 64 bytes and
+  the 8-byte checksum. The document says only that it "includes the 8 bytes of
+  the checksum", and a reader adding them to its anchor schema gets 72.
+  **ERRATA 12.** The same 78 is the anchor key's `fObjLen`.
+- **The locator names the anchor object, not its key**: 78 bytes at 2508 for
+  `runs`, whose key starts at 2462 with a 46-byte key header, and at 3451 for
+  `flags`. That key is not in the directory: the file's only key list, at 4041,
+  holds one key, `ntpl`. A reader finds an attribute set's anchor through the
+  footer and nowhere else. NOTES 8.
+- **The internal schema is 1.0's, in order**: `_rangeStart` and `_rangeLen`, plain
+  `std::uint64_t` fields, then `_userData`, a record (role 0x02) whose type name
+  is a string of length 0, the untyped record the document names. The user's
+  fields are its children, parent ID 2, under their own names.
+- **The three restrictions hold**: each set's own footer has an empty attribute
+  set list, both alias column lists are empty, and no field has role 0x04.
+- **`_rangeLen` 0 is written and read**: `flags`' first entry is (3, 0). The
+  entries are in commit order, not in order of their starts: the empty range was
+  committed before the (1, 4) range that had begun earlier.
+
+Every page is asserted too, because the ranges are the point of the format: the
+two `u64` values of each range column and the user values, at the page offsets
+the sets' page lists give (`tools/test_rntuple.py` reads them back through the
+page lists rather than trusting these offsets).
+"""
+
+spec = [
+  "spec/05-rntuple/ERRATA.md",
+  "spec/05-rntuple/NOTES.md",
+]
+
+root_version = "6.40.04"
+compression  = { algorithm = "none", setting = 0 }
+
+# The same standard-library difference as the other RNTuple cases, confined here
+# to the last record of the file by gen.C. ElementTypes.md 2.4, PLAN.md 9.6.
+digest        = false
+digest_reason = """
+ROOT::RNTuple's seven std::uint64_t members are recorded as fType 17 `ULong64_t`
+with libc++ and fType 14 `unsigned long` with libstdc++: a 28-byte length
+difference a mask cannot undo. The byte assertions still run. ElementTypes.md 2.4
+"""
+
+# -- the main footer's linked attribute set list -----------------------------
+
+[[bytes]]
+name = "main footer envelope preamble: type 2, length 233"
+offset = 3684
+type = "u64le"
+value = 15269890
+
+[[bytes]]
+name = "attribute set list: a list frame of 85 bytes"
+offset = 3824
+type = "i64le"
+value = -85
+
+[[bytes]]
+name = "attribute set list: two items"
+offset = 3832
+type = "u32le"
+value = 2
+
+[[bytes]]
+name = "runs record: a record frame of 36 bytes"
+offset = 3836
+type = "i64le"
+value = 36
+
+[[bytes]]
+name = "runs record: Schema Version Major 1"
+offset = 3844
+type = "u16le"
+value = 1
+
+[[bytes]]
+name = "runs record: Schema Version Minor 0"
+offset = 3846
+type = "u16le"
+value = 0
+
+[[bytes]]
+name = "runs record: Attribute Anchor Uncompressed Size 78, the whole anchor object (ERRATA 12)"
+offset = 3848
+type = "u32le"
+value = 78
+
+[[bytes]]
+name = "runs record: a simple locator, 78 bytes on storage"
+offset = 3852
+type = "i32le"
+value = 78
+
+[[bytes]]
+name = "runs record: locator offset 2508, the anchor key's payload"
+offset = 3856
+type = "u64le"
+value = 2508
+
+[[bytes]]
+name = "runs record: the name, an RNTuple string of length 4"
+offset = 3864
+type = "u32le"
+value = 4
+
+[[bytes]]
+name = "runs record: the name"
+offset = 3868
+type = "bytes"
+value = "runs"
+
+[[bytes]]
+name = "flags record: a record frame of 37 bytes"
+offset = 3872
+type = "i64le"
+value = 37
+
+[[bytes]]
+name = "flags record: Schema Version Major 1"
+offset = 3880
+type = "u16le"
+value = 1
+
+[[bytes]]
+name = "flags record: Schema Version Minor 0"
+offset = 3882
+type = "u16le"
+value = 0
+
+[[bytes]]
+name = "flags record: Attribute Anchor Uncompressed Size 78"
+offset = 3884
+type = "u32le"
+value = 78
+
+[[bytes]]
+name = "flags record: a simple locator, 78 bytes on storage"
+offset = 3888
+type = "i32le"
+value = 78
+
+[[bytes]]
+name = "flags record: locator offset 3451, the anchor key's payload"
+offset = 3892
+type = "u64le"
+value = 3451
+
+[[bytes]]
+name = "flags record: the name, an RNTuple string of length 5"
+offset = 3900
+type = "u32le"
+value = 5
+
+[[bytes]]
+name = "flags record: the name, ending where the list frame ends"
+offset = 3904
+type = "bytes"
+value = "flags"
+
+# -- the attribute set anchors, reached through the locators -----------------
+
+[[bytes]]
+name = "runs anchor key: fObjLen 78, the length the footer record gives"
+offset = 2468
+type = "u32"
+value = 78
+
+[[bytes]]
+name = "runs anchor key: its name is the set's name"
+offset = 2502
+type = "string"
+value = "runs"
+
+[[bytes]]
+name = "runs anchor: byte count 66 with the 0x40000000 flag, at the locator's offset"
+offset = 2508
+type = "u32"
+value = 0x40000042
+
+[[bytes]]
+name = "runs anchor: class version 2 of ROOT::RNTuple"
+offset = 2512
+type = "u16"
+value = 2
+
+[[bytes]]
+name = "runs anchor: Version Epoch 1"
+offset = 2514
+type = "u16"
+value = 1
+
+[[bytes]]
+name = "runs anchor: Version Minor 2"
+offset = 2518
+type = "u16"
+value = 2
+
+[[bytes]]
+name = "runs anchor: Seek Header 588"
+offset = 2522
+type = "u64"
+value = 588
+
+[[bytes]]
+name = "runs anchor: Len Header 462"
+offset = 2538
+type = "u64"
+value = 462
+
+[[bytes]]
+name = "runs anchor: Seek Footer 2302"
+offset = 2546
+type = "u64"
+value = 2302
+
+[[bytes]]
+name = "flags anchor key: fObjLen 78"
+offset = 3410
+type = "u32"
+value = 78
+
+[[bytes]]
+name = "flags anchor key: its name is the set's name"
+offset = 3444
+type = "string"
+value = "flags"
+
+[[bytes]]
+name = "flags anchor: byte count 66 with the 0x40000000 flag, at the locator's offset"
+offset = 3451
+type = "u32"
+value = 0x40000042
+
+[[bytes]]
+name = "flags anchor: Seek Header 1092"
+offset = 3465
+type = "u64"
+value = 1092
+
+[[bytes]]
+name = "flags anchor: Seek Footer 3244"
+offset = 3489
+type = "u64"
+value = 3244
+
+[[bytes]]
+name = "the file's key list holds one key, ntpl: neither set's anchor is listed"
+offset = 4103
+type = "u32"
+value = 1
+
+# -- the runs header: schema version 1.0, then the user's fields -------------
+
+[[bytes]]
+name = "runs header envelope preamble: type 1, length 462"
+offset = 588
+type = "u64le"
+value = 30277633
+
+[[bytes]]
+name = "runs header: the RNTuple is named after the set"
+offset = 608
+type = "bytes"
+value = "runs"
+
+[[bytes]]
+name = "runs header: five field records"
+offset = 641
+type = "u32le"
+value = 5
+
+[[bytes]]
+name = "_rangeStart: parent 0, itself, so a top-level field"
+offset = 661
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "_rangeStart: structural role 0x00 (plain)"
+offset = 665
+type = "u16le"
+value = 0x00
+
+[[bytes]]
+name = "_rangeStart: the first field"
+offset = 673
+type = "bytes"
+value = "_rangeStart"
+
+[[bytes]]
+name = "_rangeStart: type name length 13"
+offset = 684
+type = "u32le"
+value = 13
+
+[[bytes]]
+name = "_rangeStart: type std::uint64_t"
+offset = 688
+type = "bytes"
+value = "std::uint64_t"
+
+[[bytes]]
+name = "_rangeLen: parent 1, itself"
+offset = 725
+type = "u32le"
+value = 1
+
+[[bytes]]
+name = "_rangeLen: structural role 0x00 (plain)"
+offset = 729
+type = "u16le"
+value = 0x00
+
+[[bytes]]
+name = "_rangeLen: the second field"
+offset = 737
+type = "bytes"
+value = "_rangeLen"
+
+[[bytes]]
+name = "_rangeLen: type std::uint64_t"
+offset = 750
+type = "bytes"
+value = "std::uint64_t"
+
+[[bytes]]
+name = "_userData: parent 2, itself"
+offset = 787
+type = "u32le"
+value = 2
+
+[[bytes]]
+name = "_userData: structural role 0x02 (record)"
+offset = 791
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "_userData: the third field"
+offset = 799
+type = "bytes"
+value = "_userData"
+
+[[bytes]]
+name = "_userData: its type name is empty, a string of length 0 (untyped record)"
+offset = 808
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "run: parent 2, _userData"
+offset = 836
+type = "u32le"
+value = 2
+
+[[bytes]]
+name = "run: the user's name, unchanged"
+offset = 848
+type = "bytes"
+value = "run"
+
+[[bytes]]
+name = "run: type std::int32_t"
+offset = 855
+type = "bytes"
+value = "std::int32_t"
+
+[[bytes]]
+name = "weight: parent 2, _userData"
+offset = 891
+type = "u32le"
+value = 2
+
+[[bytes]]
+name = "weight: the user's name, unchanged"
+offset = 903
+type = "bytes"
+value = "weight"
+
+[[bytes]]
+name = "column 0: UInt64 (0x0A), unsplit because the RNTuple is uncompressed"
+offset = 946
+type = "u16le"
+value = 0x0A
+
+[[bytes]]
+name = "column 0 belongs to field 0, _rangeStart"
+offset = 950
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "column 1: UInt64 (0x0A)"
+offset = 966
+type = "u16le"
+value = 0x0A
+
+[[bytes]]
+name = "column 1 belongs to field 1, _rangeLen"
+offset = 970
+type = "u32le"
+value = 1
+
+[[bytes]]
+name = "runs header: restriction 2, the alias column list is empty"
+offset = 1018
+type = "i64le"
+value = -12
+
+[[bytes]]
+name = "runs header: restriction 2, zero alias columns"
+offset = 1026
+type = "u32le"
+value = 0
+
+# -- the flags header ---------------------------------------------------------
+
+[[bytes]]
+name = "flags header: four field records"
+offset = 1146
+type = "u32le"
+value = 4
+
+[[bytes]]
+name = "flags: _rangeStart is the first field"
+offset = 1178
+type = "bytes"
+value = "_rangeStart"
+
+[[bytes]]
+name = "flags: _rangeLen is the second field"
+offset = 1242
+type = "bytes"
+value = "_rangeLen"
+
+[[bytes]]
+name = "flags: _userData, structural role 0x02 (record)"
+offset = 1296
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "flags: _userData's type name is empty"
+offset = 1313
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "flag: parent 2, _userData"
+offset = 1341
+type = "u32le"
+value = 2
+
+[[bytes]]
+name = "flags header: restriction 2, zero alias columns"
+offset = 1462
+type = "u32le"
+value = 0
+
+# -- the sets' own footers: restriction 1 --------------------------------------
+
+[[bytes]]
+name = "runs footer: restriction 2, the schema extension's alias column list is empty"
+offset = 2358
+type = "i64le"
+value = -12
+
+[[bytes]]
+name = "runs footer: restriction 1, an empty attribute set list"
+offset = 2442
+type = "i64le"
+value = -12
+
+[[bytes]]
+name = "runs footer: restriction 1, zero attribute sets"
+offset = 2450
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "flags footer: restriction 1, an empty attribute set list"
+offset = 3384
+type = "i64le"
+value = -12
+
+[[bytes]]
+name = "flags footer: restriction 1, zero attribute sets"
+offset = 3392
+type = "u32le"
+value = 0
+
+# -- the pages: the ranges and the user values --------------------------------
+
+[[bytes]]
+name = "runs _rangeStart, entry 0: 0"
+offset = 1768
+type = "u64le"
+value = 0
+
+[[bytes]]
+name = "runs _rangeStart, entry 1: 3"
+offset = 1776
+type = "u64le"
+value = 3
+
+[[bytes]]
+name = "runs _rangeLen, entry 0: 3"
+offset = 1834
+type = "u64le"
+value = 3
+
+[[bytes]]
+name = "runs _rangeLen, entry 1: 3"
+offset = 1842
+type = "u64le"
+value = 3
+
+[[bytes]]
+name = "runs run, entry 0: 1"
+offset = 1900
+type = "i32le"
+value = 1
+
+[[bytes]]
+name = "runs run, entry 1: 2"
+offset = 1904
+type = "i32le"
+value = 2
+
+[[bytes]]
+name = "runs weight, entry 0: 0.25"
+offset = 1958
+type = "f32le"
+value = 0.25
+
+[[bytes]]
+name = "runs weight, entry 1: 0.75"
+offset = 1962
+type = "f32le"
+value = 0.75
+
+[[bytes]]
+name = "flags _rangeStart, entry 0: 3 (the empty range, committed first)"
+offset = 2812
+type = "u64le"
+value = 3
+
+[[bytes]]
+name = "flags _rangeStart, entry 1: 1"
+offset = 2820
+type = "u64le"
+value = 1
+
+[[bytes]]
+name = "flags _rangeLen, entry 0: 0, 'valid and refers to an empty range'"
+offset = 2878
+type = "u64le"
+value = 0
+
+[[bytes]]
+name = "flags _rangeLen, entry 1: 4"
+offset = 2886
+type = "u64le"
+value = 4
+
+[[bytes]]
+name = "flags flag, entry 0: 7"
+offset = 2944
+type = "u16le"
+value = 7
+
+[[bytes]]
+name = "flags flag, entry 1: 9"
+offset = 2946
+type = "u16le"
+value = 9

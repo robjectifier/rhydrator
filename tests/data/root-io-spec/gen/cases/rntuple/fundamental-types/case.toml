@@ -1,0 +1,253 @@
+id   = "rntuple/fundamental-types"
+file = "data/rntuple/fundamental-types.root"
+
+description = """
+One field per fundamental C++ type, and the column each one lands in.
+
+The tracked specification's *Fundamental Types* table marks a default column per
+type with an asterisk, and then says: **"If the ntuple is stored uncompressed,
+the default changes from split encoding to non-split encoding where
+applicable."** Both halves are checkable. This case checks the uncompressed half
+(thirteen types, thirteen columns, compression off), and the assertions below
+are the table's asterisked row, read out of a real file.
+
+All thirteen come out as the document says:
+
+| C++ type | Column | Code | Bits |
+|---|---|---|---|
+| `bool` | Bit | 0x00 | 1 |
+| `std::byte` | Byte | 0x01 | 8 |
+| `char` | Char | 0x02 | 8 |
+| `std::int8_t` | Int8 | 0x03 | 8 |
+| `std::uint8_t` | UInt8 | 0x04 | 8 |
+| `std::int16_t` | Int16 | 0x05 | 16 |
+| `std::uint16_t` | UInt16 | 0x06 | 16 |
+| `std::int32_t` | Int32 | 0x07 | 32 |
+| `std::uint32_t` | UInt32 | 0x08 | 32 |
+| `std::int64_t` | Int64 | 0x09 | 64 |
+| `std::uint64_t` | UInt64 | 0x0A | 64 |
+| `float` | Real32 | 0x0C | 32 |
+| `double` | Real64 | 0x0D | 64 |
+
+`Int16`, `Int32`, `Real32` and `Real64` appear here, not `SplitInt16`,
+`SplitInt32`, `SplitReal32` and `SplitReal64`, as the sentence about
+uncompressed ntuples requires. A reader that assumes the split forms because
+they are common in real files decodes every one of these columns incorrectly.
+
+The same file shows two more claims. Each of the thirteen is a plain field with
+exactly one column, as the section's opening sentence says. The type names
+follow the normalization rule that "the integer types ... are replaced by the
+corresponding `std::[u]int(8|16|32|64)_t` standard integer typedef": the sized
+integers are normalized, while `bool`, `char`, `std::byte`, `float` and `double`
+are stored as spelled.
+
+`tools/test_rntuple.py` parses that table out of the tracked copy and compares it
+against this file's decoded schema, so the two cannot drift apart silently on a
+submodule bump, as `check_versions.py` does for class versions.
+"""
+
+spec = [
+  "spec/05-rntuple/NOTES.md",
+]
+
+root_version = "6.40.04"
+compression  = { algorithm = "none", setting = 0 }
+
+# Same cause as rntuple/anchor: ROOT::RNTuple's std::uint64_t members are
+# recorded with a different fType and type name under libstdc++, a 28-byte
+# length difference no mask can undo. ElementTypes.md 2.4, PLAN.md 9.6.
+digest        = false
+digest_reason = """
+ROOT::RNTuple's seven std::uint64_t members are recorded as fType 17 `ULong64_t`
+with libc++ and fType 14 `unsigned long` with libstdc++: a 28-byte length
+difference a mask cannot undo. The byte assertions still run. ElementTypes.md 2.4
+"""
+
+[[records]]
+offset = 100
+nbytes = 148
+class  = "TFile"
+role   = "the root directory record"
+[[records]]
+offset = 248
+nbytes = 1108
+class  = "RBlob"
+role   = "the header envelope, 1066 bytes at 290"
+[[records]]
+offset = 2395
+nbytes = 133
+class  = "ROOT::RNTuple"
+role   = "the anchor"
+[[records]]
+offset = 2646
+nbytes = 1298
+class  = "TList"
+role   = "StreamerInfo"
+
+[[bytes]]
+name = "the header envelope preamble: type 1, length 1066"
+offset = 290
+type = "u64le"
+value = 69861377
+
+[[bytes]]
+name = "Version Minor in the anchor, which is 2 for the pinned release"
+offset = 2460
+type = "u16"
+value = 2
+
+[[bytes]]
+name = "fBool (bool) is column type Bit = 0x00"
+offset = 1072
+type = "u16le"
+value = 0x0000
+
+[[bytes]]
+name = "fBool: 1 bits on storage"
+offset = 1074
+type = "u16le"
+value = 1
+
+[[bytes]]
+name = "fByte (std::byte) is column type Byte = 0x01"
+offset = 1092
+type = "u16le"
+value = 0x0001
+
+[[bytes]]
+name = "fByte: 8 bits on storage"
+offset = 1094
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fChar (char) is column type Char = 0x02"
+offset = 1112
+type = "u16le"
+value = 0x0002
+
+[[bytes]]
+name = "fChar: 8 bits on storage"
+offset = 1114
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fI8 (std::int8_t) is column type Int8 = 0x03"
+offset = 1132
+type = "u16le"
+value = 0x0003
+
+[[bytes]]
+name = "fI8: 8 bits on storage"
+offset = 1134
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fU8 (std::uint8_t) is column type UInt8 = 0x04"
+offset = 1152
+type = "u16le"
+value = 0x0004
+
+[[bytes]]
+name = "fU8: 8 bits on storage"
+offset = 1154
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fI16 (std::int16_t) is column type Int16 = 0x05"
+offset = 1172
+type = "u16le"
+value = 0x0005
+
+[[bytes]]
+name = "fI16: 16 bits on storage"
+offset = 1174
+type = "u16le"
+value = 16
+
+[[bytes]]
+name = "fU16 (std::uint16_t) is column type UInt16 = 0x06"
+offset = 1192
+type = "u16le"
+value = 0x0006
+
+[[bytes]]
+name = "fU16: 16 bits on storage"
+offset = 1194
+type = "u16le"
+value = 16
+
+[[bytes]]
+name = "fI32 (std::int32_t) is column type Int32 = 0x07"
+offset = 1212
+type = "u16le"
+value = 0x0007
+
+[[bytes]]
+name = "fI32: 32 bits on storage"
+offset = 1214
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fU32 (std::uint32_t) is column type UInt32 = 0x08"
+offset = 1232
+type = "u16le"
+value = 0x0008
+
+[[bytes]]
+name = "fU32: 32 bits on storage"
+offset = 1234
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fI64 (std::int64_t) is column type Int64 = 0x09"
+offset = 1252
+type = "u16le"
+value = 0x0009
+
+[[bytes]]
+name = "fI64: 64 bits on storage"
+offset = 1254
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fU64 (std::uint64_t) is column type UInt64 = 0x0a"
+offset = 1272
+type = "u16le"
+value = 0x000a
+
+[[bytes]]
+name = "fU64: 64 bits on storage"
+offset = 1274
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fFloat (float) is column type Real32 = 0x0c"
+offset = 1292
+type = "u16le"
+value = 0x000c
+
+[[bytes]]
+name = "fFloat: 32 bits on storage"
+offset = 1294
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fDouble (double) is column type Real64 = 0x0d"
+offset = 1312
+type = "u16le"
+value = 0x000d
+
+[[bytes]]
+name = "fDouble: 64 bits on storage"
+offset = 1314
+type = "u16le"
+value = 64

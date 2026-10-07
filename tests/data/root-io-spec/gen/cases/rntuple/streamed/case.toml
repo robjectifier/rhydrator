@@ -1,0 +1,173 @@
+id   = "rntuple/streamed"
+file = "data/rntuple/streamed.root"
+
+description = """
+A field serialized by the ROOT streamer instead of split: structural role
+0x04, with an `Index64` and a `Byte` column, "identical to a collection of
+`std::byte`" as *ROOT streamed types* says.
+
+`RNEvent` is an ordinary record field; its member `fInner` is an `RNStreamedInner`
+whose dictionary has `rntuple.streamerMode = "true"`, which `gen.C` sets on the
+`TClass` at runtime the way ROOT's own test does. Two constraints on reaching
+this path:
+
+- A top-level field of a streamer-mode class is refused: "not supported as
+  native RNTuple class" (`root/tree/ntuple/src/RFieldMeta.cxx:95`). The streamed
+  form exists only underneath a native field, which is why `fInner` is a member.
+- The mode is a dictionary attribute, not a property of the class. Nothing in
+  `RNStreamedInner` asks to be streamed, and the file records only the
+  consequence, role 0x04.
+
+The rest of this case is about where the streamer information for that field
+goes, which is not where the document introduces it. *Extra type information*
+is a subsection of **Header Envelope**, but the header's list is empty here. The
+record is in the **footer's schema extension**, whose four lists the document
+says are "identical to the last four fields in Header Envelope". It can only be
+there, because the set of streamed classes is not known until the dataset is
+committed (`root/tree/ntuple/src/RPageStorage.cxx:1290-1310`). ERRATA 10.
+
+The content is **length-prefixed**, which the record's layout does not show: a
+32-bit little-endian size, then the streamed object. ERRATA 9. What follows the
+size is ordinary ROOT serialization, the object layer of
+`spec/02-serialization/` rather than RNTuple's own encoding: a byte count with
+the 0x40000000 flag, the 0xffffffff new-class tag, the class name `TList`, and
+inside it a `TStreamerInfo` naming `RNStreamedInner`. All four are asserted, so
+an RNTuple reader that has to decode this list can see where it crosses into
+that layer.
+"""
+
+# The same standard-library difference as the other RNTuple cases: the
+# ROOT::RNTuple anchor's streamer info is recorded with a different fType and type
+# name under libstdc++. ElementTypes.md 2.4, PLAN.md 9.6.
+digest        = false
+digest_reason = """
+ROOT::RNTuple's seven std::uint64_t members are recorded as fType 17 `ULong64_t`
+with libc++ and fType 14 `unsigned long` with libstdc++: a 28-byte length
+difference a mask cannot undo. The byte assertions still run. ElementTypes.md 2.4
+"""
+
+[[bytes]]
+name = "the header envelope preamble: type 1, length 410"
+offset = 272
+type = "u64le"
+value = 26869761
+
+[[bytes]]
+name = "fEvent: structural role 0x02 (record)"
+offset = 353
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "fEnergy: structural role 0x00 (plain)"
+offset = 410
+type = "u16le"
+value = 0x00
+
+[[bytes]]
+name = "fInner: structural role 0x04 (streamer)"
+offset = 462
+type = "u16le"
+value = 0x04
+
+[[bytes]]
+name = "fPlain: structural role 0x00 (plain)"
+offset = 527
+type = "u16le"
+value = 0x00
+
+[[bytes]]
+name = "fEnergy: column type Real32 = 0x0c"
+offset = 578
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fEnergy: 32 bits on storage"
+offset = 580
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fInner: column type Index64 = 0x0f"
+offset = 598
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fInner: 64 bits on storage"
+offset = 600
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fInner: column type Byte = 0x01"
+offset = 618
+type = "u16le"
+value = 0x01
+
+[[bytes]]
+name = "fInner: 8 bits on storage"
+offset = 620
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fPlain: column type Real32 = 0x0c"
+offset = 638
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fPlain: 32 bits on storage"
+offset = 640
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "the footer's extra type information list holds one record"
+offset = 1212
+type = "u32le"
+value = 1
+
+[[bytes]]
+name = "extra type info: content identifier 0, a serialized ROOT streamer info"
+offset = 1224
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "extra type info: type version 0, as the document requires"
+offset = 1228
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "extra type info: the type name is the empty string, so its length is 0"
+offset = 1232
+type = "u32le"
+value = 0
+
+[[bytes]]
+name = "extra type info: the CONTENT is a length-prefixed string too -- ERRATA 9"
+offset = 1236
+type = "u32le"
+value = 438
+
+[[bytes]]
+name = "the content's first word: a ROOT byte count with the 0x40000000 flag, so the payload is an ordinary streamed object -- Buffer.md 2"
+offset = 1240
+type = "u32"
+value = 1073742258
+
+[[bytes]]
+name = "the content's class tag: 0xffffffff, a class written by name -- Buffer.md 5.1"
+offset = 1244
+type = "u32"
+value = 4294967295
+
+[[bytes]]
+name = "the streamed TList names RNStreamedInner: the counted string's length byte"
+offset = 1319
+type = "u8"
+value = 15

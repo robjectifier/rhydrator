@@ -1,0 +1,340 @@
+id   = "rntuple/map"
+file = "data/rntuple/map.root"
+
+description = """
+The associative containers of *Stdlib Types and Collections*, one field each:
+`std::map`, `std::unordered_map`, `std::multimap` and `std::unordered_multimap`,
+the four types the document's `std::map` subsection covers in one paragraph.
+Two entries: the first fills every map, the second leaves them all empty.
+
+The claim is that each is "a collection parent field, whose principal column is
+of type `(Split)Index[64|32]` and a child field of type `std::pair<K, V>` named
+`_0`". It holds for all four, and the pair child is a record parent with no
+columns of its own and children `_0` and `_1`, the same shape as a top-level
+`std::pair` in `rntuple/collections`. Type names are normalised inside the
+arguments too: `std::map<std::string,std::int32_t>`.
+
+**Each instantiation is one ROOT ships a compiled dictionary for**, which is why
+this fixture could not be written before 2026-09-23. From the interpreter, ROOT
+6.40.04 writes a map field only when the class under RNTuple's normalised type
+name has a dictionary; otherwise `Fill()` aborts with `R__ASSERT(0)` in
+`TGenCollectionProxy__VectorNext` (`root/io/io/src/TGenCollectionProxy.cxx:1528-1530`).
+NOTES.md 5 has the measurement.
+
+Two page locators can name the same bytes. `fMap` and `fMulti` both hold two
+pairs and then none, so their index columns' pages are identical, 2 then 2; so
+are `fUnordered`'s and `fUnMulti`'s, 1 then 1. ROOT writes each such page once
+and points both locators at it: `EnableSamePageMerging`, on by default
+(`root/tree/ntuple/src/RPageStorage.cxx:1117-1142`). The tracked document does
+not say that page locators can alias. NOTES.md 7.
+
+Every column is asserted by type code and bit width in schema order, then the
+header envelope's preamble, the pages' contents, and the four aliased locators.
+The fields' names and roles are checked through the decoded schema in
+`tools/test_rntuple.py`.
+"""
+
+# The same standard-library difference as the other RNTuple cases: the
+# ROOT::RNTuple anchor's streamer info is recorded with a different fType and type
+# name under libstdc++, a length difference no mask can undo. ElementTypes.md 2.4,
+# PLAN.md 9.6.
+digest        = false
+digest_reason = """
+ROOT::RNTuple's seven std::uint64_t members are recorded as fType 17 `ULong64_t`
+with libc++ and fType 14 `unsigned long` with libstdc++: a 28-byte length
+difference a mask cannot undo. The byte assertions still run. ElementTypes.md 2.4
+"""
+
+[[bytes]]
+name = "the header envelope preamble: type 1, length 1494"
+offset = 262
+type = "u64le"
+value = 97910785
+
+[[bytes]]
+name = "fMap: column type Index64 = 0x0f"
+offset = 1432
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fMap: 64 bits on storage"
+offset = 1434
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fMap._0._0: column type Index64 = 0x0f"
+offset = 1452
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fMap._0._0: 64 bits on storage"
+offset = 1454
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fMap._0._0: column type Char = 0x02"
+offset = 1472
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "fMap._0._0: 8 bits on storage"
+offset = 1474
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fMap._0._1: column type Int32 = 0x07"
+offset = 1492
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fMap._0._1: 32 bits on storage"
+offset = 1494
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fUnordered: column type Index64 = 0x0f"
+offset = 1512
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fUnordered: 64 bits on storage"
+offset = 1514
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fUnordered._0._0: column type Int32 = 0x07"
+offset = 1532
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fUnordered._0._0: 32 bits on storage"
+offset = 1534
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fUnordered._0._1: column type Int32 = 0x07"
+offset = 1552
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fUnordered._0._1: 32 bits on storage"
+offset = 1554
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fMulti: column type Index64 = 0x0f"
+offset = 1572
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fMulti: 64 bits on storage"
+offset = 1574
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fMulti._0._0: column type Index64 = 0x0f"
+offset = 1592
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fMulti._0._0: 64 bits on storage"
+offset = 1594
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fMulti._0._0: column type Char = 0x02"
+offset = 1612
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "fMulti._0._0: 8 bits on storage"
+offset = 1614
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fMulti._0._1: column type Int32 = 0x07"
+offset = 1632
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fMulti._0._1: 32 bits on storage"
+offset = 1634
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fUnMulti: column type Index64 = 0x0f"
+offset = 1652
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fUnMulti: 64 bits on storage"
+offset = 1654
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fUnMulti._0._0: column type Index64 = 0x0f"
+offset = 1672
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fUnMulti._0._0: 64 bits on storage"
+offset = 1674
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fUnMulti._0._0: column type Char = 0x02"
+offset = 1692
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "fUnMulti._0._0: 8 bits on storage"
+offset = 1694
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fUnMulti._0._1: column type Int32 = 0x07"
+offset = 1712
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fUnMulti._0._1: 32 bits on storage"
+offset = 1714
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fMap's and fMulti's index page: 2 elements after entry 0"
+offset = 1798
+type = "i64le"
+value = 2
+
+[[bytes]]
+name = "... and still 2 after entry 1, which is empty"
+offset = 1806
+type = "i64le"
+value = 2
+
+[[bytes]]
+name = "fMap._0._0's index: 'a' ends at 1"
+offset = 1822
+type = "i64le"
+value = 1
+
+[[bytes]]
+name = "fMap._0._0's index: 'bc' ends at 3"
+offset = 1830
+type = "i64le"
+value = 3
+
+[[bytes]]
+name = "fMap's keys, in key order"
+offset = 1846
+type = "bytes"
+value = [0x61, 0x62, 0x63]
+
+[[bytes]]
+name = "fMap._0._1: the values 1 and 2"
+offset = 1857
+type = "bytes"
+value = [0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
+
+[[bytes]]
+name = "fUnordered's and fUnMulti's index page: 1, then 1"
+offset = 1873
+type = "bytes"
+value = [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+
+[[bytes]]
+name = "fUnordered._0._0: the key 7"
+offset = 1897
+type = "u32le"
+value = 7
+
+[[bytes]]
+name = "fUnordered._0._1: the value 70"
+offset = 1909
+type = "u32le"
+value = 70
+
+[[bytes]]
+name = "fMulti's keys: 'k' twice, which is what a multimap allows"
+offset = 1945
+type = "bytes"
+value = [0x6b, 0x6b]
+
+[[bytes]]
+name = "fMulti._0._1: the values 3 and 4"
+offset = 1955
+type = "bytes"
+value = [0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00]
+
+[[bytes]]
+name = "fUnMulti._0._1: the value 5"
+offset = 1996
+type = "u32le"
+value = 5
+
+[[bytes]]
+name = "fMap's index column (column 0): a 16-byte page"
+offset = 2142
+type = "u32le"
+value = 16
+
+[[bytes]]
+name = "... at 1798"
+offset = 2146
+type = "u64le"
+value = 1798
+
+[[bytes]]
+name = "fMulti's index column (column 7): the same 16 bytes"
+offset = 2422
+type = "u32le"
+value = 16
+
+[[bytes]]
+name = "... at the same 1798 -- one page, two locators"
+offset = 2426
+type = "u64le"
+value = 1798
+
+[[bytes]]
+name = "fUnordered's index column (column 4): at 1873"
+offset = 2306
+type = "u64le"
+value = 1873
+
+[[bytes]]
+name = "fUnMulti's index column (column 11): at the same 1873"
+offset = 2586
+type = "u64le"
+value = 1873

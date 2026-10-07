@@ -1,0 +1,329 @@
+id   = "rntuple/user-class"
+file = "data/rntuple/user-class.root"
+
+description = """
+A user-defined class in an RNTuple, with a base class, two enums, a vector of
+itself and a transient member.
+
+The claims are in **User-defined classes → Regular class / struct** and
+**User-defined enums**, and every one of them holds:
+
+| Claim | What the file shows |
+|---|---|
+| "stored as a record parent field with no attached columns" | `fHit` is role **record** with no columns |
+| "The field name of member subfields is identical to the C++ field name" | `fEnergy`, `fFlavour`, `fCharge`, `fSamples`, `fLabel` |
+| "base class subfields are numbered and preceded by a colon, i.e. `:_0`" | `fHit.:_0`, type `RNBase`, itself a record |
+| "Transient members must be marked, e.g. by a `//!` comment" | `fScratch` has no field at all, and nothing shifts |
+| an enum is "a plain field with a single subfield named `_0`" whose type is the underlying integer | `fFlavour._0` is `std::uint32_t` for the unscoped enum, `fCharge._0` is `std::int16_t` for `enum class : std::int16_t` |
+| "The type checksum and the type version ... stored as field information" (said of SoA classes) | true of an ordinary class too: both class fields have flag 0x04 and a checksum |
+
+A `std::vector<RNHit>` repeats the record under a child named `_0`, so the
+record shape is asserted twice in one file, once at top level and once inside a
+collection, and the two checksums are identical.
+
+`RNHit` has no `ClassDef`, so its `TClass` version is −1, and RNTuple stores the
+type version as an unsigned 32-bit word: the file holds **0xFFFFFFFF**. A reader
+comparing type versions numerically treats that as newer than any version ever
+written. See ERRATA 8.
+
+ROOT's own `PDG_t` already puts `kUp`, `kDown` and `kStrange` in the global
+namespace, so an unscoped enum that repeats those enumerator names does not
+compile. `classes.h` prefixes them.
+
+The assertions below are the header envelope preamble, the two class fields' type
+version and checksum, and every column's type code and bit width in schema order.
+The field names and the tree structure are checked through the decoded schema in
+`tools/test_rntuple.py`.
+"""
+
+# The same standard-library difference as the other RNTuple cases: the
+# ROOT::RNTuple anchor's streamer info is recorded with a different fType and type
+# name under libstdc++. ElementTypes.md 2.4, PLAN.md 9.6.
+digest        = false
+digest_reason = """
+ROOT::RNTuple's seven std::uint64_t members are recorded as fType 17 `ULong64_t`
+with libc++ and fType 14 `unsigned long` with libstdc++: a 28-byte length
+difference a mask cannot undo. The byte assertions still run. ElementTypes.md 2.4
+"""
+
+[[bytes]]
+name = "the header envelope preamble: type 1, length 1985"
+offset = 276
+type = "u64le"
+value = 130088961
+
+[[bytes]]
+name = "fHit (RNHit): Type Version, which is -1 as an unsigned word"
+offset = 345
+type = "u32le"
+value = 4294967295
+
+[[bytes]]
+name = "fHit (RNHit): the TClass checksum, flag 0x04"
+offset = 382
+type = "u32le"
+value = 0xf80143e3
+
+[[bytes]]
+name = "fHit.:_0 (RNBase): Type Version, which is -1 as an unsigned word"
+offset = 398
+type = "u32le"
+value = 4294967295
+
+[[bytes]]
+name = "fHit.:_0 (RNBase): the TClass checksum, flag 0x04"
+offset = 435
+type = "u32le"
+value = 0x67729b56
+
+[[bytes]]
+name = "fHits._0 (RNHit): Type Version, which is -1 as an unsigned word"
+offset = 1018
+type = "u32le"
+value = 4294967295
+
+[[bytes]]
+name = "fHits._0 (RNHit): the TClass checksum, flag 0x04"
+offset = 1053
+type = "u32le"
+value = 0xf80143e3
+
+[[bytes]]
+name = "fHits._0.:_0 (RNBase): Type Version, which is -1 as an unsigned word"
+offset = 1069
+type = "u32le"
+value = 4294967295
+
+[[bytes]]
+name = "fHits._0.:_0 (RNBase): the TClass checksum, flag 0x04"
+offset = 1106
+type = "u32le"
+value = 0x67729b56
+
+[[bytes]]
+name = "fHit.:_0.fBaseId: column type Int32 = 0x07"
+offset = 1857
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fHit.:_0.fBaseId: 32 bits on storage"
+offset = 1859
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fHit.fEnergy: column type Real32 = 0x0c"
+offset = 1877
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fHit.fEnergy: 32 bits on storage"
+offset = 1879
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fHit.fFlavour._0: column type UInt32 = 0x08"
+offset = 1897
+type = "u16le"
+value = 0x08
+
+[[bytes]]
+name = "fHit.fFlavour._0: 32 bits on storage"
+offset = 1899
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fHit.fCharge._0: column type Int16 = 0x05"
+offset = 1917
+type = "u16le"
+value = 0x05
+
+[[bytes]]
+name = "fHit.fCharge._0: 16 bits on storage"
+offset = 1919
+type = "u16le"
+value = 16
+
+[[bytes]]
+name = "fHit.fSamples: column type Index64 = 0x0f"
+offset = 1937
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fHit.fSamples: 64 bits on storage"
+offset = 1939
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fHit.fSamples._0: column type Real32 = 0x0c"
+offset = 1957
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fHit.fSamples._0: 32 bits on storage"
+offset = 1959
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fHit.fLabel: column type Index64 = 0x0f"
+offset = 1977
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fHit.fLabel: 64 bits on storage"
+offset = 1979
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fHit.fLabel: column type Char = 0x02"
+offset = 1997
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "fHit.fLabel: 8 bits on storage"
+offset = 1999
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fHits: column type Index64 = 0x0f"
+offset = 2017
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fHits: 64 bits on storage"
+offset = 2019
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fHits._0.:_0.fBaseId: column type Int32 = 0x07"
+offset = 2037
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fHits._0.:_0.fBaseId: 32 bits on storage"
+offset = 2039
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fHits._0.fEnergy: column type Real32 = 0x0c"
+offset = 2057
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fHits._0.fEnergy: 32 bits on storage"
+offset = 2059
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fHits._0.fFlavour._0: column type UInt32 = 0x08"
+offset = 2077
+type = "u16le"
+value = 0x08
+
+[[bytes]]
+name = "fHits._0.fFlavour._0: 32 bits on storage"
+offset = 2079
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fHits._0.fCharge._0: column type Int16 = 0x05"
+offset = 2097
+type = "u16le"
+value = 0x05
+
+[[bytes]]
+name = "fHits._0.fCharge._0: 16 bits on storage"
+offset = 2099
+type = "u16le"
+value = 16
+
+[[bytes]]
+name = "fHits._0.fSamples: column type Index64 = 0x0f"
+offset = 2117
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fHits._0.fSamples: 64 bits on storage"
+offset = 2119
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fHits._0.fSamples._0: column type Real32 = 0x0c"
+offset = 2137
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fHits._0.fSamples._0: 32 bits on storage"
+offset = 2139
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fHits._0.fLabel: column type Index64 = 0x0f"
+offset = 2157
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fHits._0.fLabel: 64 bits on storage"
+offset = 2159
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fHits._0.fLabel: column type Char = 0x02"
+offset = 2177
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "fHits._0.fLabel: 8 bits on storage"
+offset = 2179
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fFlavour._0: column type UInt32 = 0x08"
+offset = 2197
+type = "u16le"
+value = 0x08
+
+[[bytes]]
+name = "fFlavour._0: 32 bits on storage"
+offset = 2199
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fCharge._0: column type Int16 = 0x05"
+offset = 2217
+type = "u16le"
+value = 0x05
+
+[[bytes]]
+name = "fCharge._0: 16 bits on storage"
+offset = 2219
+type = "u16le"
+value = 16

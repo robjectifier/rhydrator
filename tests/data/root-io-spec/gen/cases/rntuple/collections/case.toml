@@ -1,0 +1,379 @@
+id   = "rntuple/collections"
+file = "data/rntuple/collections.root"
+
+description = """
+One field per stdlib type the tracked specification maps, and the fields and
+columns each one produces.
+
+Where `rntuple/fundamental-types` checks a table, this checks prose: one
+paragraph per type in **Stdlib Types and Collections**, each saying how many
+fields the type becomes, what the parent's columns are, and what the children are
+called. All of it holds. Three points are worth recording:
+
+| Claim | What the file shows |
+|---|---|
+| "a **repetitive** field ... with no attached columns" for `std::array` | There is no repetitive structure on disk. `fArray` is a plain field with no columns and a repetition of 3; `fBitset` is a plain field with a `Bit` column and a repetition of 8. "Repetitive" describes the non-zero repetition parameter, not a fourth structural role |
+| "an **empty** parent field" for `std::pair` and `std::tuple` | Structural role record, and no columns at all. `std::atomic` and a user enum use the same shape but role plain |
+| Type name normalization | Applies inside template arguments: `std::array<std::int32_t,3>`, `std::variant<std::int32_t,float>`, `std::set<std::int32_t>`. `ROOT::RVec<float>` is written fully qualified as `ROOT::VecOps::RVec<float>`, and the document says implementations must also accept the short alias |
+
+`fDouble32` is the reason this case exists beyond confirmation.
+**Low-precision Floating Points** says a `Double32_t` is a `double` field with a
+`SplitReal32` column, and *Fundamental Types* says that in an uncompressed
+ntuple a default split column becomes unsplit. This ntuple is uncompressed and
+every other column here is unsplit, but `fDouble32` is `SplitReal32`. It is the
+only exception, because the `Double32_t` override runs after the uncompressed
+adjustment and ignores it (`root/tree/ntuple/src/RFieldBase.cxx:892-915`). See
+ERRATA 7.
+
+`std::map` is absent here and has its own case, `rntuple/map`. ROOT 6.40.04
+aborts writing a map from the interpreter unless the instantiation has a
+compiled dictionary, with `R__ASSERT(0)` in `TGenCollectionProxy__VectorNext`
+(`root/io/io/src/TGenCollectionProxy.cxx:1528-1530`). NOTES.md 5 says which maps
+can be written.
+
+Every column below is asserted by its type code and its bit width, in schema
+order. The fields have no byte assertions of their own: their names and
+structures are checked through the decoded schema in `tools/test_rntuple.py`,
+which compares them with the claims parsed out of the tracked copy.
+"""
+
+# The same standard-library difference as the other two RNTuple cases: the
+# ROOT::RNTuple anchor's streamer info is recorded with a different fType and type
+# name under libstdc++, a length difference no mask can undo. ElementTypes.md 2.4,
+# PLAN.md 9.6.
+digest        = false
+digest_reason = """
+ROOT::RNTuple's seven std::uint64_t members are recorded as fType 17 `ULong64_t`
+with libc++ and fType 14 `unsigned long` with libstdc++: a 28-byte length
+difference a mask cannot undo. The byte assertions still run. ElementTypes.md 2.4
+"""
+
+[[bytes]]
+name = "the header envelope preamble: type 1, length 2464"
+offset = 278
+type = "u64le"
+value = 161480705
+
+[[bytes]]
+name = "fString: column type Index64 = 0x0f"
+offset = 2178
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fString: 64 bits on storage"
+offset = 2180
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fString: column type Char = 0x02"
+offset = 2198
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "fString: 8 bits on storage"
+offset = 2200
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fVector: column type Index64 = 0x0f"
+offset = 2218
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fVector: 64 bits on storage"
+offset = 2220
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fVector._0: column type Real32 = 0x0c"
+offset = 2238
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fVector._0: 32 bits on storage"
+offset = 2240
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fRVec: column type Index64 = 0x0f"
+offset = 2258
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fRVec: 64 bits on storage"
+offset = 2260
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fRVec._0: column type Real32 = 0x0c"
+offset = 2278
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fRVec._0: 32 bits on storage"
+offset = 2280
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fArray._0: column type Int32 = 0x07"
+offset = 2298
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fArray._0: 32 bits on storage"
+offset = 2300
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fVariant: column type Switch = 0x10"
+offset = 2318
+type = "u16le"
+value = 0x10
+
+[[bytes]]
+name = "fVariant: 96 bits on storage"
+offset = 2320
+type = "u16le"
+value = 96
+
+[[bytes]]
+name = "fVariant._0: column type Int32 = 0x07"
+offset = 2338
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fVariant._0: 32 bits on storage"
+offset = 2340
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fVariant._1: column type Real32 = 0x0c"
+offset = 2358
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fVariant._1: 32 bits on storage"
+offset = 2360
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fPair._0: column type Int32 = 0x07"
+offset = 2378
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fPair._0: 32 bits on storage"
+offset = 2380
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fPair._1: column type Real32 = 0x0c"
+offset = 2398
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fPair._1: 32 bits on storage"
+offset = 2400
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fTuple._0: column type Int32 = 0x07"
+offset = 2418
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fTuple._0: 32 bits on storage"
+offset = 2420
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fTuple._1: column type Real32 = 0x0c"
+offset = 2438
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fTuple._1: 32 bits on storage"
+offset = 2440
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fTuple._2: column type Char = 0x02"
+offset = 2458
+type = "u16le"
+value = 0x02
+
+[[bytes]]
+name = "fTuple._2: 8 bits on storage"
+offset = 2460
+type = "u16le"
+value = 8
+
+[[bytes]]
+name = "fBitset: column type Bit = 0x00"
+offset = 2478
+type = "u16le"
+value = 0x00
+
+[[bytes]]
+name = "fBitset: 1 bits on storage"
+offset = 2480
+type = "u16le"
+value = 1
+
+[[bytes]]
+name = "fUnique: column type Index64 = 0x0f"
+offset = 2498
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fUnique: 64 bits on storage"
+offset = 2500
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fUnique._0: column type Real32 = 0x0c"
+offset = 2518
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fUnique._0: 32 bits on storage"
+offset = 2520
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fOptional: column type Index64 = 0x0f"
+offset = 2538
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fOptional: 64 bits on storage"
+offset = 2540
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fOptional._0: column type Real32 = 0x0c"
+offset = 2558
+type = "u16le"
+value = 0x0c
+
+[[bytes]]
+name = "fOptional._0: 32 bits on storage"
+offset = 2560
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fSet: column type Index64 = 0x0f"
+offset = 2578
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fSet: 64 bits on storage"
+offset = 2580
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fSet._0: column type Int32 = 0x07"
+offset = 2598
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fSet._0: 32 bits on storage"
+offset = 2600
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fAtomic._0: column type Int32 = 0x07"
+offset = 2618
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fAtomic._0: 32 bits on storage"
+offset = 2620
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fNested: column type Index64 = 0x0f"
+offset = 2638
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fNested: 64 bits on storage"
+offset = 2640
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fNested._0: column type Index64 = 0x0f"
+offset = 2658
+type = "u16le"
+value = 0x0f
+
+[[bytes]]
+name = "fNested._0: 64 bits on storage"
+offset = 2660
+type = "u16le"
+value = 64
+
+[[bytes]]
+name = "fNested._0._0: column type Int32 = 0x07"
+offset = 2678
+type = "u16le"
+value = 0x07
+
+[[bytes]]
+name = "fNested._0._0: 32 bits on storage"
+offset = 2680
+type = "u16le"
+value = 32
+
+[[bytes]]
+name = "fDouble32: column type SplitReal32 = 0x18"
+offset = 2698
+type = "u16le"
+value = 0x18
+
+[[bytes]]
+name = "fDouble32: 32 bits on storage"
+offset = 2700
+type = "u16le"
+value = 32
