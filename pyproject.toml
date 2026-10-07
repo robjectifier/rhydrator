@@ -30,7 +30,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = ["rootfilespec>=0.0.3", "sqlalchemy"]
+dependencies = ["rootfilespec>=0.1.0", "sqlalchemy"]
 
 [project.urls]
 Homepage = "https://github.com/robjectifier/rhydrator"
@@ -100,6 +100,19 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 warn_unreachable = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+
+# numpy's stubs use Python 3.12 syntax, which mypy rejects at python_version
+# 3.10; rootfilespec skips them the same way.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
+# layoutviz.py still calls rootfilespec 0.0.3's API; its port onto reader.py
+# (#18) removes this override.
+[[tool.mypy.overrides]]
+module = "rhydrator.layoutviz"
+ignore_errors = true
 
 # [[tool.mypy.overrides]]
 # module = "rhydrator.*"

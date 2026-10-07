@@ -194,3 +194,6 @@ debug.py
 # uv
 
 uv.lock
+
+# Claude Code personal notes
+CLAUDE.local.md
