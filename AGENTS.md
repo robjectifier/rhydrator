@@ -187,6 +187,17 @@ the spec where it applies.
   `Assisted-by: <tool>:<model id>`.
 - Commit messages end with that same `Assisted-by:` line.
 - Text a person writes themselves carries neither mark.
+- In a guided PR (below), the agent's scaffolding and the person's code go in
+  separate commits, so each is marked correctly: the agent's commits end with
+  the `Assisted-by:` line, the person's carry none.
+
+**Guided PRs.** A person may write a PR's code themselves with an agent guiding,
+to learn (they say so, or their own instructions do). Then the agent plans the
+steps, writes the issue's tests and a skeleton (signatures, types, docstrings,
+`TODO`s), explains what each step needs, and reviews what the person writes. It
+does not write the implementation unless asked for a specific piece, and does
+not fix the person's code for them, CI failures included. Everything else in
+this file applies as written.
 
 **Review and merge.**
 
