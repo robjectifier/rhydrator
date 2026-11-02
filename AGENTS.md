@@ -55,10 +55,11 @@ the rules and the issue win; ask if unsure.
   present in both the file and the dataset must match entirely, children
   included, or the ingest fails. A file may lack or add whole top-level fields;
   a new encoding adds a representation.
-- **Files:** anything rootfilespec reads, tested on files from ROOT 6.36 (the
-  CMS files) and 6.40.04 (the fixtures). Attribute sets are out of scope: their
-  bytes stay non-page bytes. A file rhydrator can't handle fails with a clear
-  error naming the file and the reason, and nothing of it is committed.
+- **Files:** anything rootfilespec reads, tested on files from ROOT 6.36
+  (MiniAOD, MiniSim) and 6.40.04 (NanoAOD and the fixtures). Attribute sets are
+  out of scope: their bytes stay non-page bytes. A file rhydrator can't handle
+  fails with a clear error naming the file and the reason, and nothing of it is
+  committed.
 
 ## The format reference
 
