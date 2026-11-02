@@ -133,7 +133,7 @@ LARGE_FILES_VAR = "RHYDRATOR_LARGE_FILES"
 """The environment variable naming the directory that holds the large files."""
 
 LARGE_FILE_SIZES: dict[str, int] = {
-    "DYJetsToLL_RunIIAutumn18NanoAODv7_RNTuple.root": 1_818_127_396,
+    "DYJetsToLL_RunIIAutumn18NanoAODv7_RNTuple_named_zstd.root": 1_891_767_386,
     "initialconversion_rntuple_mini24_lzma4_buffer4.rntpl": 3_391_001_326,
     "initialconversion_rntuple_minisim24_lzma4_buffer4.rntpl": 5_999_969_177,
 }

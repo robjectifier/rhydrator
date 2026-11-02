@@ -61,11 +61,11 @@ are skipped and nothing else changes. CI never runs them.
 To run them, put the three files in one directory, under exactly these names,
 and set `RHYDRATOR_LARGE_FILES` to that directory's absolute path:
 
-| File                                                      | What                              | Size (bytes)  |
-| --------------------------------------------------------- | --------------------------------- | ------------- |
-| `DYJetsToLL_RunIIAutumn18NanoAODv7_RNTuple.root`          | CMS NanoAOD, converted to RNTuple | 1,818,127,396 |
-| `initialconversion_rntuple_mini24_lzma4_buffer4.rntpl`    | CMS MiniAOD, written by ROOT 6.36 | 3,391,001,326 |
-| `initialconversion_rntuple_minisim24_lzma4_buffer4.rntpl` | CMS MiniSim, written by ROOT 6.36 | 5,999,969,177 |
+| File                                                        | What                                 | Size (bytes)  |
+| ----------------------------------------------------------- | ------------------------------------ | ------------- |
+| `DYJetsToLL_RunIIAutumn18NanoAODv7_RNTuple_named_zstd.root` | CMS NanoAOD, written by ROOT 6.40.04 | 1,891,767,386 |
+| `initialconversion_rntuple_mini24_lzma4_buffer4.rntpl`      | CMS MiniAOD, written by ROOT 6.36    | 3,391,001,326 |
+| `initialconversion_rntuple_minisim24_lzma4_buffer4.rntpl`   | CMS MiniSim, written by ROOT 6.36    | 5,999,969,177 |
 
 ```sh
 RHYDRATOR_LARGE_FILES=/path/to/large-files uv run pytest

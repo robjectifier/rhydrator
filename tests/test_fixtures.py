@@ -134,7 +134,7 @@ def test_skhep_unknown_file_is_an_error():
 
 # --- Large files -------------------------------------------------------------
 
-LARGE_NAME = "DYJetsToLL_RunIIAutumn18NanoAODv7_RNTuple.root"
+LARGE_NAME = "DYJetsToLL_RunIIAutumn18NanoAODv7_RNTuple_named_zstd.root"
 
 
 def test_large_file_at_pinned_size(large_file: Path):
