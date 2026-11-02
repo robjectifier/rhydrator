@@ -46,6 +46,7 @@ test = [
   "pytest >=9",
   "pytest-cov >=7",
   "scikit-hep-testdata",
+  "xxhash",
 ]
 dev = [
   { include-group = "test" },

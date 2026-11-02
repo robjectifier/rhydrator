@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import struct
 from pathlib import Path
 
 import pytest
 from conftest import (
+    ANCHOR_FEND_OFFSET,
+    ANCHOR_FOOTER,
+    ANCHOR_HEADER,
     LARGE_FILE_SIZES,
     LARGE_FILES_VAR,
     ROOT_IO_SPEC_DIR,
     ROOT_IO_SPEC_FILES,
     SKHEP_FILES,
+    TRAILING_BYTES,
+    UNKNOWN_FEATURE_FLAG,
+    envelope_checksum,
     large_file_path,
     root_io_spec_path,
     skhep_path,
@@ -165,3 +172,61 @@ def test_large_file_found(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         f.truncate(LARGE_FILE_SIZES[LARGE_NAME])
     monkeypatch.setenv(LARGE_FILES_VAR, str(tmp_path))
     assert large_file_path(LARGE_NAME) == tmp_path / LARGE_NAME
+
+
+# --- Files made at test time -------------------------------------------------
+
+
+def test_anchor_offsets_match_the_anchor():
+    data = root_io_spec_path("anchor.root").read_bytes()
+    # The anchor's fields after its version (ERRATA 2): seek, compressed and
+    # uncompressed length of the header, then of the footer; big-endian.
+    header_seek, header_len = ANCHOR_HEADER
+    footer_seek, footer_len = ANCHOR_FOOTER
+    assert struct.unpack_from(">6Q", data, 1058 + 8) == (
+        header_seek,
+        header_len,
+        header_len,
+        footer_seek,
+        footer_len,
+        footer_len,
+    )
+    for seek, length in (ANCHOR_HEADER, ANCHOR_FOOTER):
+        assert data[seek + length - 8 : seek + length] == envelope_checksum(
+            data, seek, length
+        )
+
+
+def test_bytes_after_end(file_with_bytes_after_end: Path):
+    anchor = root_io_spec_path("anchor.root").read_bytes()
+    data = file_with_bytes_after_end.read_bytes()
+    assert data == anchor + TRAILING_BYTES
+    (fend,) = struct.unpack_from(">i", data, ANCHOR_FEND_OFFSET)
+    assert fend == len(anchor) < len(data)
+
+
+def test_feature_flag_set_and_checksums_verify(file_with_feature_flag: Path):
+    data = file_with_feature_flag.read_bytes()
+    header_seek, header_len = ANCHOR_HEADER
+    footer_seek, footer_len = ANCHOR_FOOTER
+    assert struct.unpack_from("<q", data, header_seek + 8) == (UNKNOWN_FEATURE_FLAG,)
+    header_checksum = data[header_seek + header_len - 8 : header_seek + header_len]
+    assert header_checksum == envelope_checksum(data, header_seek, header_len)
+    assert data[footer_seek + 16 : footer_seek + 24] == header_checksum
+    assert data[footer_seek + footer_len - 8 : footer_seek + footer_len] == (
+        envelope_checksum(data, footer_seek, footer_len)
+    )
+
+
+def test_feature_flag_changes_only_the_flag_and_checksums(
+    file_with_feature_flag: Path,
+):
+    anchor = root_io_spec_path("anchor.root").read_bytes()
+    data = file_with_feature_flag.read_bytes()
+    assert len(data) == len(anchor)
+    changed = {i for i, (a, b) in enumerate(zip(anchor, data, strict=True)) if a != b}
+    # The flags at 276, the header checksum at 500, its copy in the footer at
+    # 854 and the footer checksum at 990 (anchor's case.toml pins 276, 500, 854).
+    allowed = set().union(*(range(at, at + 8) for at in (276, 500, 854, 990)))
+    assert changed
+    assert changed <= allowed

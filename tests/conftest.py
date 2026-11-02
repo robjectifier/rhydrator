@@ -11,6 +11,9 @@
   the repository, never in CI. A test skips when the variable is unset or
   empty; when it is set, a missing file, or one of another size, fails, so a
   wrong path cannot pass as a skip.
+- Files made at test time from ``anchor.root``, whose envelopes are
+  uncompressed: one with bytes after ``fEND``, one with an unknown feature flag
+  set and its checksums recomputed.
 
 Test modules take these through the fixtures below. ``test_fixtures.py`` also
 imports the plain functions, to test them directly.
@@ -19,9 +22,11 @@ imports the plain functions, to test them directly.
 from __future__ import annotations
 
 import os
+import struct
 from pathlib import Path
 
 import pytest
+import xxhash
 
 ROOT_IO_SPEC_DIR = Path(__file__).parent.parent / "reference" / "root-io-spec"
 """The root-io-spec submodule's checkout."""
@@ -160,3 +165,70 @@ def large_file_path(name: str) -> Path:
 def large_file(request: pytest.FixtureRequest) -> Path:
     """Each of the large files in turn, as a path."""
     return large_file_path(request.param)
+
+
+# --- Files made at test time -------------------------------------------------
+
+# Offsets in anchor.root, from its case.toml and the anchor's own fields: the
+# header envelope at 268 (240 bytes) and the footer envelope at 838 (160
+# bytes). Each envelope ends with the XXH3-64 of everything before it,
+# little-endian (spec, Envelopes); each begins with an 8-byte type and length,
+# then the feature flags (spec, Header Envelope and Footer Envelope). The
+# footer's next 8 bytes repeat the header's checksum.
+ANCHOR_HEADER = (268, 240)
+ANCHOR_FOOTER = (838, 160)
+ANCHOR_FEND_OFFSET = 12
+"""Where the file header's 32-bit ``fEND`` is (big-endian, a small file)."""
+
+TRAILING_BYTES = b"bytes after fEND"
+
+UNKNOWN_FEATURE_FLAG = 1 << 62
+"""A feature flag no RNTuple version defines: bit 62, the highest bit that
+doesn't mean more flags follow (spec, Feature Flags)."""
+
+
+def envelope_checksum(data: bytes | bytearray, seek: int, length: int) -> bytes:
+    """The XXH3-64 checksum of the envelope at *seek*, as stored."""
+    return struct.pack("<Q", xxhash.xxh3_64_intdigest(data[seek : seek + length - 8]))
+
+
+def with_bytes_after_end(source: Path) -> bytes:
+    """*source*'s bytes, followed by ``TRAILING_BYTES``; ``fEND`` unchanged."""
+    return source.read_bytes() + TRAILING_BYTES
+
+
+def with_feature_flag(source: Path, flag: int = UNKNOWN_FEATURE_FLAG) -> bytes:
+    """``anchor.root``'s bytes with *flag* set in the header's feature flags.
+
+    The header's checksum is recomputed, and so are the footer's copy of it and
+    the footer's own checksum, so only the flag makes the file unreadable.
+    """
+    data = bytearray(source.read_bytes())
+    header_seek, header_len = ANCHOR_HEADER
+    footer_seek, footer_len = ANCHOR_FOOTER
+    flags_at = header_seek + 8
+    (flags,) = struct.unpack_from("<q", data, flags_at)
+    struct.pack_into("<q", data, flags_at, flags | flag)
+    header_checksum = envelope_checksum(data, header_seek, header_len)
+    data[header_seek + header_len - 8 : header_seek + header_len] = header_checksum
+    data[footer_seek + 16 : footer_seek + 24] = header_checksum
+    footer_checksum = envelope_checksum(data, footer_seek, footer_len)
+    data[footer_seek + footer_len - 8 : footer_seek + footer_len] = footer_checksum
+    return bytes(data)
+
+
+@pytest.fixture
+def file_with_bytes_after_end(tmp_path: Path) -> Path:
+    """``anchor.root`` with bytes after ``fEND``, written to a temporary file."""
+    path = tmp_path / "bytes-after-fend.root"
+    path.write_bytes(with_bytes_after_end(root_io_spec_path("anchor.root")))
+    return path
+
+
+@pytest.fixture
+def file_with_feature_flag(tmp_path: Path) -> Path:
+    """``anchor.root`` with an unknown feature flag set, written to a temporary
+    file."""
+    path = tmp_path / "feature-flag.root"
+    path.write_bytes(with_feature_flag(root_io_spec_path("anchor.root")))
+    return path
