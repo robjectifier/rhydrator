@@ -34,3 +34,16 @@ RHydrator is a Python library for (de)hydrating ROOT RNTuple files and storing
 the metadata in a relational database. The metadata is organized as shown:
 
 ![ER Diagram](docs/robjectifier.png)
+
+## Running the tests
+
+```sh
+git clone https://github.com/robjectifier/rhydrator.git
+cd rhydrator
+git submodule update --init reference/root-io-spec
+uv run pytest
+```
+
+The submodule `reference/root-io-spec` holds the small RNTuple files most tests
+read. Never initialize it with `--recursive`: root-io-spec's own submodule is
+ROOT's source tree (1.5 GB). Without the submodule, those tests fail.
