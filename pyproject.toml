@@ -12,25 +12,18 @@ description = "A bidirectional data transformation tool for ROOT RNTuple files. 
 readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 classifiers = [
   "Development Status :: 1 - Planning",
   "Intended Audience :: Science/Research",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = ["rootfilespec>=0.1.0", "sqlalchemy"]
+dependencies = ["rootfilespec>=0.1.0", "sqlalchemy>=2.1"]
 
 [project.urls]
 Homepage = "https://github.com/robjectifier/rhydrator"
@@ -45,7 +38,7 @@ rlayoutviz = "rhydrator.layoutviz:main"
 test = [
   "pytest >=9",
   "pytest-cov >=7",
-  "scikit-hep-testdata",
+  "scikit-hep-testdata>=0.6.9",
 ]
 dev = [
   { include-group = "test" },
@@ -93,7 +86,7 @@ report.exclude_also = [
 
 [tool.mypy]
 files = ["src", "tests"]
-python_version = "3.10"
+python_version = "3.14"
 warn_unused_configs = true
 strict = false # disable for now while beginning development
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
@@ -101,24 +94,11 @@ warn_unreachable = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
-# numpy's stubs use Python 3.12 syntax, which mypy rejects at python_version
-# 3.10; rootfilespec skips them the same way.
-[[tool.mypy.overrides]]
-module = ["numpy", "numpy.*"]
-follow_imports = "skip"
-follow_imports_for_stubs = true
-
 # layoutviz.py still calls rootfilespec 0.0.3's API; its port onto reader.py
 # (#18) removes this override.
 [[tool.mypy.overrides]]
 module = "rhydrator.layoutviz"
 ignore_errors = true
-
-# [[tool.mypy.overrides]]
-# module = "rhydrator.*"
-# disallow_untyped_defs = true
-# disallow_incomplete_defs = true
-
 
 [tool.ruff]
 
@@ -168,13 +148,18 @@ ignore = [
 # Uncomment if using a _compat.typing backport
 # typing-modules = ["rhydrator._compat.typing"]
 
+# SQLAlchemy reads a model's annotations at run time, so the types they name
+# must be imported for real, not only for type checking.
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["sqlalchemy.orm.DeclarativeBase"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["T20"]
 "noxfile.py" = ["T20"]
 
-
+# remove this?
 [tool.pylint]
-py-version = "3.10"
+py-version = "3.14"
 ignore-paths = [".*/_version.py"]
 reports.output-format = "colorized"
 similarities.ignore-imports = "yes"
