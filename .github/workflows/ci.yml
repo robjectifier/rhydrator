@@ -53,6 +53,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # The test fixtures in reference/root-io-spec. Never "recursive": the
+          # ROOT source tree (1.5 GB) is a submodule of that one.
+          submodules: true
 
       - uses: actions/setup-python@v7
         with:
