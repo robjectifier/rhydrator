@@ -4,8 +4,8 @@
   (pinned at d1618ad). The submodule is part of the repository, so a missing
   file fails the test.
 - scikit-hep-testdata's RNTuple files, through ``skhep_testdata.data_path``,
-  which downloads them once into its cache. Optional: a test skips, with the
-  reason, when the package is missing or a download fails.
+  which downloads them once into its cache: every RNTuple file the installed
+  release knows. A test skips, with the reason, when a download fails.
 - The three large CMS files, from the directory named by the environment
   variable ``RHYDRATOR_LARGE_FILES`` (the README, *Running the tests*). Not in
   the repository, never in CI. A test skips when the variable is unset or
@@ -22,6 +22,7 @@ import os
 from pathlib import Path
 
 import pytest
+import skhep_testdata
 
 ROOT_IO_SPEC_DIR = Path(__file__).parent.parent / "reference" / "root-io-spec"
 """The root-io-spec submodule's checkout."""
@@ -70,48 +71,18 @@ def root_io_spec_file(request: pytest.FixtureRequest) -> Path:
 
 # --- scikit-hep-testdata -----------------------------------------------------
 
-SKHEP_FILES: tuple[str, ...] = (
-    "Run2012BC_DoubleMuParked_Muons_1000evts_rntuple_v1-0-0-0.root",
-    "cmsopendata2015_ttbar_19980_NANOAOD_RNTupleImporter_rntuple_v1-0-0-1.root",
-    "ntpl001_staff_rntuple_v1-0-0-0.root",
-    "ntpl001_staff_rntuple_v1-0-1-0.root",
-    "rntviewer-testfile-multiple-rntuples-v1-0-0-0.root",
-    "rntviewer-testfile-uncomp-single-rntuple-v1-0-0-0.root",
-    "test_1jag_int_float_rntuple_v1-0-0-0.root",
-    "test_atomic_bitset_rntuple_v1-0-0-0.root",
-    "test_bit_rntuple_v1-0-0-0.root",
-    "test_class_inheritance_rntuple_v1-0-0-1.root",
-    "test_emptystruct_invalidvar_rntuple_v1-0-0-0.root",
-    "test_extension_columns_rntuple_v1-0-0-0.root",
-    "test_float_types_rntuple_v1-0-0-0.root",
-    "test_index_multicluster_rntuple_v1-0-0-0.root",
-    "test_int_5e4_rntuple_v1-0-0-0.root",
-    "test_int_float_rntuple_v1-0-0-0.root",
-    "test_int_multicluster_rntuple_v1-0-0-0.root",
-    "test_int_vfloat_tlv_vtlv_rntuple_v1-0-0-0.root",
-    "test_multiple_cluster_groups_rntuple_v1-0-0-0.root",
-    "test_multiple_representations_rntuple_v1-0-0-0.root",
-    "test_nested_structs_rntuple_v1-0-0-0.root",
-    "test_split_3e4_rntuple_v1-0-0-0.root",
-    "test_splitint_rntuple_v1-0-1-0.root",
-    "test_stl_containers_rntuple_v1-0-0-0.root",
-    "uproot-physlite-rntuple_v1-0-0-0.root",
-)
-"""scikit-hep-testdata's RNTuple files, by file name."""
+SKHEP_FILES = sorted(n for n in skhep_testdata.known_files if "rntuple" in n)
+"""scikit-hep-testdata's RNTuple files, by file name: every one the installed
+release knows, so a new release's files are tested without a change here."""
 
 
 def skhep_path(name: str) -> Path:
     """Return the path of scikit-hep-testdata's file called *name*.
 
-    Skips the calling test when the package is missing or the download fails.
-    A name the package doesn't know raises ``FileNotFoundError``: that is a
-    mistake in ``SKHEP_FILES``, not an unavailable source.
+    Skips the calling test when the download fails.
     """
-    skhep_testdata = pytest.importorskip("skhep_testdata")
     try:
         return Path(skhep_testdata.data_path(name))
-    except FileNotFoundError:
-        raise  # a typo in SKHEP_FILES must not pass as a skip
     except OSError as err:  # requests' errors are OSErrors
         pytest.skip(f"scikit-hep-testdata could not fetch {name}: {err}")
 

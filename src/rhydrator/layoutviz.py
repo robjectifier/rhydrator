@@ -12,7 +12,7 @@ import os
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, TypeAlias, TypedDict
+from typing import Literal, TypedDict
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOTFile
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
@@ -33,7 +33,7 @@ class ColumnData(TypedDict):
     pages: list[PageData]
 
 
-FieldColumnMap: TypeAlias = defaultdict[int, list[ColumnData]]
+type FieldColumnMap = defaultdict[int, list[ColumnData]]
 
 
 class Frame(TypedDict):

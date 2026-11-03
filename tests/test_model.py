@@ -1,7 +1,7 @@
 """Test script to create tables and insert dummy data."""
 
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -50,7 +50,7 @@ def test_create_tables_and_insert_data(db_session):
     session = db_session
 
     # Create a dataset
-    dataset = Dataset(id=1, created_at=datetime.now(timezone.utc))
+    dataset = Dataset(id=1, created_at=datetime.now(UTC))
     session.add(dataset)
 
     # Create input files

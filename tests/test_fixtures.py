@@ -1,9 +1,13 @@
 """The test files are found; a missing one never passes (#8)."""
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+import skhep_testdata
 from conftest import LARGE_FILES_VAR, large_file_path, root_io_spec_path, skhep_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # --- root-io-spec ------------------------------------------------------------
 
@@ -26,8 +30,6 @@ def test_skhep_file_exists(skhep_file: Path):
 
 
 def test_skhep_failed_download_skips(monkeypatch: pytest.MonkeyPatch):
-    skhep_testdata = pytest.importorskip("skhep_testdata")
-
     def offline(*_args: object) -> str:
         msg = "offline"
         raise ConnectionError(msg)

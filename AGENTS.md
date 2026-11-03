@@ -87,7 +87,7 @@ Related repositories:
 ## Python environment
 
 - Package code is in `src/rhydrator/`; tests mirror it under `tests/`.
-- `requires-python = ">=3.10"`. Target 3.10+ unless told otherwise.
+- `requires-python = ">=3.14"`. Target 3.14+; CI tests 3.14 only.
 - Install with `uv sync`. Run project code with `uv run`.
 - root-io-spec's test fixtures are the submodule `reference/root-io-spec`:
   `git submodule update --init reference/root-io-spec` after cloning. Never
