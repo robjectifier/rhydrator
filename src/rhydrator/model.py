@@ -1,10 +1,12 @@
 """SQLAlchemy ORM models for rhydrator."""
 
+import enum
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
     Float,
     ForeignKey,
     Integer,
@@ -22,9 +24,9 @@ class Dataset(Base):
     __tablename__ = "dataset"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     created_at: Mapped[datetime | None]
 
-    # Relationships
     input_files: Mapped[list["InputFile"]] = relationship(back_populates="dataset")
     rntuples: Mapped[list["RNTuple"]] = relationship(back_populates="dataset")
 
@@ -36,17 +38,51 @@ class InputFile(Base):
     dataset_id: Mapped[int] = mapped_column(ForeignKey("dataset.id"), nullable=False)
     uuid: Mapped[UUID | None]
     lfn: Mapped[str | None] = mapped_column(String)
-    entries: Mapped[int | None] = mapped_column(Integer)
 
-    # Relationships
-    dataset: Mapped["Dataset"] = relationship(back_populates="input_files")
+    dataset: Mapped[Dataset] = relationship(back_populates="input_files")
+    page_bundles: Mapped[list["PageBundle"]] = relationship(back_populates="input_file")
+    rehydration_info: Mapped["RehydrationInfo"] = relationship(
+        back_populates="input_file"
+    )
     rntuple_instances: Mapped[list["RNTupleInstance"]] = relationship(
         back_populates="file"
     )
-    objects: Mapped[list["Object"]] = relationship(back_populates="input_file")
-    rehydration_infos: Mapped[list["RehydrationInfo"]] = relationship(
-        back_populates="input_file"
+
+
+class BundleState(enum.Enum):
+    PENDING_UPLOAD = "pending_upload"
+    AVAILABLE = "available"
+    OFFLOADED_TO_TAPE = "offloaded_to_tape"
+    DEPRECATED = "deprecated"
+    DELETED = "deleted"
+
+
+class PageBundle(Base):
+    __tablename__ = "page_bundle"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    input_file_id: Mapped[int] = mapped_column(
+        ForeignKey("input_file.id"), nullable=False
     )
+    state: Mapped[BundleState]
+    """Last known upload state of the page bundle (i.e. the Ceph S3 object)"""
+
+    input_file: Mapped[InputFile] = relationship(back_populates="page_bundles")
+    pages: Mapped[list["Page"]] = relationship(back_populates="page_bundle")
+
+
+class RehydrationInfo(Base):
+    """One MessagePack record per input file, stored at objects/rehydration-<record_object_id>."""
+
+    __tablename__ = "rehydration_info"
+
+    record_object_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    input_file_id: Mapped[int] = mapped_column(
+        ForeignKey("input_file.id"), nullable=False, unique=True
+    )
+    format_version: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    input_file: Mapped[InputFile] = relationship(back_populates="rehydration_info")
 
 
 class RNTuple(Base):
@@ -56,9 +92,9 @@ class RNTuple(Base):
     dataset_id: Mapped[int] = mapped_column(ForeignKey("dataset.id"), nullable=False)
     name: Mapped[str | None] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(String)
+    schema_hash: Mapped[str] = mapped_column(String)
 
-    # Relationships
-    dataset: Mapped["Dataset"] = relationship(back_populates="rntuples")
+    dataset: Mapped[Dataset] = relationship(back_populates="rntuples")
     instances: Mapped[list["RNTupleInstance"]] = relationship(back_populates="rntuple")
     fields: Mapped[list["Field"]] = relationship(back_populates="rntuple")
 
@@ -69,13 +105,41 @@ class RNTupleInstance(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     file_id: Mapped[int] = mapped_column(ForeignKey("input_file.id"), nullable=False)
     rntuple_id: Mapped[int] = mapped_column(ForeignKey("rntuple.id"), nullable=False)
+    entries: Mapped[int | None] = mapped_column(Integer)
 
-    # Relationships
-    file: Mapped["InputFile"] = relationship(back_populates="rntuple_instances")
-    rntuple: Mapped["RNTuple"] = relationship(back_populates="instances")
+    file: Mapped[InputFile] = relationship(back_populates="rntuple_instances")
+    rntuple: Mapped[RNTuple] = relationship(back_populates="instances")
     cluster_groups: Mapped[list["ClusterGroup"]] = relationship(
         back_populates="rntuple_instance"
     )
+
+
+class ClusterGroup(Base):
+    __tablename__ = "cluster_group"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rntuple_instance_id: Mapped[int] = mapped_column(
+        ForeignKey("rntuple_instance.id"), nullable=False
+    )
+
+    rntuple_instance: Mapped[RNTupleInstance] = relationship(
+        back_populates="cluster_groups"
+    )
+    clusters: Mapped[list["Cluster"]] = relationship(back_populates="cluster_group")
+
+
+class Cluster(Base):
+    __tablename__ = "cluster"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cluster_group_id: Mapped[int] = mapped_column(
+        ForeignKey("cluster_group.id"), nullable=False
+    )
+    entry_start: Mapped[int | None] = mapped_column(Integer)
+    entry_stop: Mapped[int | None] = mapped_column(Integer)
+
+    cluster_group: Mapped[ClusterGroup] = relationship(back_populates="clusters")
+    page_groups: Mapped[list["PageGroup"]] = relationship(back_populates="cluster")
 
 
 class Field(Base):
@@ -93,8 +157,7 @@ class Field(Base):
     array_size: Mapped[int | None] = mapped_column(Integer)
     type_checksum: Mapped[int | None] = mapped_column(Integer)
 
-    # Relationships
-    rntuple: Mapped["RNTuple"] = relationship(back_populates="fields")
+    rntuple: Mapped[RNTuple] = relationship(back_populates="fields")
     parent: Mapped[Optional["Field"]] = relationship(
         back_populates="children", remote_side=[id]
     )
@@ -109,55 +172,11 @@ class Column(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     field_id: Mapped[int] = mapped_column(ForeignKey("field.id"), nullable=False)
 
-    # Relationships
-    field: Mapped["Field"] = relationship(back_populates="columns")
+    field: Mapped[Field] = relationship(back_populates="columns")
     representations: Mapped[list["ColumnRepresentation"]] = relationship(
         back_populates="column"
     )
     alias_columns: Mapped[list["AliasColumn"]] = relationship(back_populates="column")
-
-
-class ClusterGroup(Base):
-    __tablename__ = "cluster_group"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    rntuple_instance_id: Mapped[int] = mapped_column(
-        ForeignKey("rntuple_instance.id"), nullable=False
-    )
-
-    # Relationships
-    rntuple_instance: Mapped["RNTupleInstance"] = relationship(
-        back_populates="cluster_groups"
-    )
-    clusters: Mapped[list["Cluster"]] = relationship(back_populates="cluster_group")
-
-
-class Cluster(Base):
-    __tablename__ = "cluster"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    cluster_group_id: Mapped[int] = mapped_column(
-        ForeignKey("cluster_group.id"), nullable=False
-    )
-    entry_start: Mapped[int | None] = mapped_column(Integer)
-    entry_stop: Mapped[int | None] = mapped_column(Integer)
-
-    # Relationships
-    cluster_group: Mapped["ClusterGroup"] = relationship(back_populates="clusters")
-    page_groups: Mapped[list["PageGroup"]] = relationship(back_populates="cluster")
-
-
-class Object(Base):
-    __tablename__ = "object"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    input_file_id: Mapped[int] = mapped_column(
-        ForeignKey("input_file.id"), nullable=False
-    )
-
-    # Relationships
-    input_file: Mapped["InputFile"] = relationship(back_populates="objects")
-    page_groups: Mapped[list["PageGroup"]] = relationship(back_populates="object")
 
 
 class ColumnRepresentation(Base):
@@ -171,46 +190,10 @@ class ColumnRepresentation(Base):
     min_value: Mapped[float | None] = mapped_column(Float)
     max_value: Mapped[float | None] = mapped_column(Float)
 
-    # Relationships
-    column: Mapped["Column"] = relationship(back_populates="representations")
+    column: Mapped[Column] = relationship(back_populates="representations")
     page_groups: Mapped[list["PageGroup"]] = relationship(
         back_populates="column_representation"
     )
-
-
-class PageGroup(Base):
-    __tablename__ = "page_group"
-    __table_args__ = (UniqueConstraint("cluster_id", "column_rep_id"),)
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    object_id: Mapped[int] = mapped_column(ForeignKey("object.id"), nullable=False)
-    cluster_id: Mapped[int] = mapped_column(ForeignKey("cluster.id"), nullable=False)
-    column_rep_id: Mapped[int] = mapped_column(
-        ForeignKey("column_representation.id"), nullable=False
-    )
-    element_offset: Mapped[int] = mapped_column(Integer, nullable=False)
-    compression_settings: Mapped[str | None] = mapped_column(String)
-
-    # Relationships
-    object: Mapped["Object"] = relationship(back_populates="page_groups")
-    cluster: Mapped["Cluster"] = relationship(back_populates="page_groups")
-    column_representation: Mapped["ColumnRepresentation"] = relationship(
-        back_populates="page_groups"
-    )
-    pages: Mapped[list["Page"]] = relationship(back_populates="page_group")
-
-
-class Page(Base):
-    __tablename__ = "page"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    page_group_id: Mapped[int] = mapped_column(
-        ForeignKey("page_group.id"), nullable=False
-    )
-    index: Mapped[int | None] = mapped_column(Integer)
-
-    # Relationships
-    page_group: Mapped["PageGroup"] = relationship(back_populates="pages")
 
 
 class AliasColumn(Base):
@@ -223,18 +206,44 @@ class AliasColumn(Base):
         ForeignKey("column.id"), primary_key=True, nullable=False
     )
 
-    # Relationships
-    field: Mapped["Field"] = relationship(back_populates="alias_columns")
-    column: Mapped["Column"] = relationship(back_populates="alias_columns")
+    field: Mapped[Field] = relationship(back_populates="alias_columns")
+    column: Mapped[Column] = relationship(back_populates="alias_columns")
 
 
-class RehydrationInfo(Base):
-    __tablename__ = "rehydration_info"
+class PageGroup(Base):
+    __tablename__ = "page_group"
+    __table_args__ = (UniqueConstraint("cluster_id", "column_rep_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    input_file_id: Mapped[int] = mapped_column(
-        ForeignKey("input_file.id"), nullable=False
+    cluster_id: Mapped[int] = mapped_column(ForeignKey("cluster.id"), nullable=False)
+    column_rep_id: Mapped[int] = mapped_column(
+        ForeignKey("column_representation.id"), nullable=False
     )
+    n_elements: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    """Total elements of this column in the cluster, including leading implicit zeros."""
+    n_zero_elements: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    """Leading elements that read as zero and have no stored page."""
+    compression_settings: Mapped[str | None] = mapped_column(String)
 
-    # Relationships
-    input_file: Mapped["InputFile"] = relationship(back_populates="rehydration_infos")
+    cluster: Mapped[Cluster] = relationship(back_populates="page_groups")
+    column_representation: Mapped[ColumnRepresentation] = relationship(
+        back_populates="page_groups"
+    )
+    pages: Mapped[list["Page"]] = relationship(back_populates="page_group")
+
+
+class Page(Base):
+    __tablename__ = "page"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    page_group_id: Mapped[int] = mapped_column(
+        ForeignKey("page_group.id"), nullable=False
+    )
+    first_element: Mapped[int | None] = mapped_column(BigInteger)
+    """Index of the page's first element within this column in this cluster."""
+    bundle_id: Mapped[int] = mapped_column(ForeignKey("page_bundle.id"), nullable=False)
+    bundle_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    """Offset of the page's data within the page bundle (Ceph S3 object)."""
+
+    page_bundle: Mapped[PageBundle] = relationship(back_populates="pages")
+    page_group: Mapped[PageGroup] = relationship(back_populates="pages")
