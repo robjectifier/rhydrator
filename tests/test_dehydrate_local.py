@@ -135,16 +135,29 @@ def test_existing_output_directory(tmp_path: Path, recreate: bool):
 
 
 @pytest.mark.parametrize(
-    ("directory", "reason"), [(".", "working directory"), ("inputs", "input file")]
+    ("directory", "reason"),
+    [
+        (".", "working directory"),
+        ("..", "working directory"),
+        ("cwd_link", "working directory"),
+        ("parent_link", "working directory"),
+        ("../inputs", "input file"),
+        ("inputs_link", "input file"),
+    ],
 )
 def test_recreate_rejects_overlapping_paths(tmp_path: Path, directory: str, reason: str):
+    cwd = tmp_path / "work"
+    cwd.mkdir()
     source = tmp_path / "inputs" / "anchor.root"
     source.parent.mkdir()
     source.write_bytes(root_io_spec_path("anchor.root").read_bytes())
+    (cwd / "cwd_link").symlink_to(cwd, target_is_directory=True)
+    (cwd / "parent_link").symlink_to(tmp_path, target_is_directory=True)
+    (cwd / "inputs_link").symlink_to(source.parent, target_is_directory=True)
     script = Path(__file__).parents[1] / "scripts" / "dehydrate_local.py"
     result = subprocess.run(
         [sys.executable, script, source, "/store/anchor.root", "new", "-r", "--output_dir", directory],
-        cwd=tmp_path,
+        cwd=cwd,
         capture_output=True,
         text=True,
         check=False,
@@ -152,3 +165,4 @@ def test_recreate_rejects_overlapping_paths(tmp_path: Path, directory: str, reas
     assert result.returncode == 2
     assert f"would delete the {reason}" in result.stderr
     assert source.is_file()
+    assert cwd.is_dir()

@@ -54,6 +54,19 @@ new_file = ingest.NewFile(
 # Create the output directory if it doesn't exist, or recreate it if specified
 output_dir = Path(args.output_dir)
 if args.recreate and output_dir.exists():
+    resolved_output = output_dir.resolve()
+    protected = {
+        "working directory": Path.cwd().resolve(),
+        "input file": Path(args.file_path).resolve(),
+    }
+    for reason, path in protected.items():
+        if path.is_relative_to(resolved_output):
+            parser.error(f"--recreate would delete the {reason}: {output_dir}")
+    input_path = Path(args.file_path).absolute()
+    if resolved_output in input_path.parents or output_dir.absolute() in input_path.parents:
+        parser.error(f"--recreate would delete the input file: {output_dir}")
+    if output_dir.is_symlink():
+        parser.error(f"--recreate cannot replace a symbolic link: {output_dir}")
     if args.debug:
         print(f"{term.warning}Recreating output directory{term.reset} {args.output_dir!r}")  # noqa: T201
     shutil.rmtree(output_dir)

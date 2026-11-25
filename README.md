@@ -34,6 +34,9 @@ RHydrator is a Python library for (de)hydrating ROOT RNTuple files and storing
 the metadata in a relational database.
 
 Local ingest writes page bundles to `objects/<bundle_id>` under `--output_dir`.
+`--recreate` deletes the entire output directory before ingest. It refuses
+an output directory that contains the input file or the current working
+directory, and it refuses a symbolic link as the output directory.
 Each input file also has one MessagePack record at
 `objects/rehydration-<record_object_id>`. The SQLite `rehydration_info` row
 links the input file to that object and records its format version.
