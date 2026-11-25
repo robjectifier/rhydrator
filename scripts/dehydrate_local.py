@@ -86,7 +86,5 @@ with Session(engine) as session:
         session, new_file, objects_dir=objects_dir, bundler=BUNDLERS[args.bundler], debug=args.debug
     )
 
-    session.commit()
-
 if args.print_db or args.print_db_full:
     print_db(db_path, full=args.print_db_full)
