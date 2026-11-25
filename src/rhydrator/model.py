@@ -1,10 +1,13 @@
 """SQLAlchemy ORM models for rhydrator."""
 
 from datetime import datetime
+import enum
 from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
+    Enum,
     Float,
     ForeignKey,
     Integer,
@@ -20,12 +23,28 @@ class Base(DeclarativeBase):
 
 # ---- Dataset group ----
 
-
 class Dataset(Base):
+    """Table `dataset`.
+
+    ```python
+    # Columns
+    id:         int
+    name:       str
+    created_at: datetime | None
+
+    # Relationships
+    input_files: list[InputFile]
+    rntuples:    list[RNTuple]
+    ```
+    """
+
     __tablename__ = "dataset"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    """Dataset name."""
     created_at: Mapped[datetime | None]
+    """Date the dataset was created.""" # abbott: should this be time when file dir created or last time file dir was modified?
 
     # Relationships
     input_files: Mapped[list["InputFile"]] = relationship(back_populates="dataset")
@@ -33,63 +52,124 @@ class Dataset(Base):
 
 
 class InputFile(Base):
+    """Table `input_file`.
+
+    ```python
+    # Columns
+    id:         int
+    dataset_id: int
+    uuid:       UUID | None
+    lfn:        str | None
+
+    # Relationships
+    dataset:           Dataset
+    rntuple_instances: list[RNTupleInstance]
+    page_bundles:      list[PageBundle]
+    rehydration_info:  RehydrationInfo
+    ```
+    """
+
     __tablename__ = "input_file"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     dataset_id: Mapped[int] = mapped_column(ForeignKey("dataset.id"), nullable=False)
     uuid: Mapped[UUID | None]
+    """File UUID."""
     lfn: Mapped[str | None] = mapped_column(String)
-    entries: Mapped[int | None] = mapped_column(Integer)
+    """File logical name."""
 
     # Relationships
     dataset: Mapped[Dataset] = relationship(back_populates="input_files")
+    page_bundles: Mapped[list["PageBundle"]] = relationship(back_populates="input_file")
+    rehydration_info: Mapped["RehydrationInfo"] = relationship(
+        back_populates="input_file"
+    )
     rntuple_instances: Mapped[list["RNTupleInstance"]] = relationship(
         back_populates="file"
-    )
-    objects: Mapped[list["Object"]] = relationship(back_populates="input_file")
-    rehydration_infos: Mapped[list["RehydrationInfo"]] = relationship(
-        back_populates="input_file"
     )
 
 
 # ---- ObjectStore group ----
 
+class BundleState(enum.Enum):
+    PENDING_UPLOAD = "pending_upload"
+    AVAILABLE = "available"
+    OFFLOADED_TO_TAPE = "offloaded_to_tape"
+    DEPRECATED = "deprecated"
+    DELETED = "deleted"
 
-class Object(Base):
-    __tablename__ = "object"
+class PageBundle(Base):
+    """Table `page_bundle`.
+
+    ```python
+    # Columns
+    id:            int
+    input_file_id: int
+    state:         BundleState
+
+    # Relationships
+    input_file: InputFile
+    pages:      list[Page]
+    ```
+    """
+
+    __tablename__ = "page_bundle"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     input_file_id: Mapped[int] = mapped_column(
         ForeignKey("input_file.id"), nullable=False
     )
+    state: Mapped[BundleState]
+    """Last known upload state of the page bundle (i.e. the Ceph S3 object)"""
 
     # Relationships
-    input_file: Mapped[InputFile] = relationship(back_populates="objects")
-    page_groups: Mapped[list["PageGroup"]] = relationship(back_populates="object")
+    input_file: Mapped[InputFile] = relationship(back_populates="page_bundles")
+    pages: Mapped[list["Page"]] = relationship(back_populates="page_bundle")
 
 
 class RehydrationInfo(Base):
+    """One MessagePack record per input file, stored at objects/rehydration-<record_object_id>."""
+
     __tablename__ = "rehydration_info"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    record_object_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     input_file_id: Mapped[int] = mapped_column(
-        ForeignKey("input_file.id"), nullable=False
+        ForeignKey("input_file.id"), nullable=False, unique=True
     )
+    format_version: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Relationships
-    input_file: Mapped[InputFile] = relationship(back_populates="rehydration_infos")
+    input_file: Mapped[InputFile] = relationship(back_populates="rehydration_info")
 
 
 # ---- RNTuple group ----
 
 
 class RNTuple(Base):
+    """Table `rntuple`.
+
+    ```python
+    # Columns
+    id:          int
+    dataset_id:  int
+    name:        str | None
+    description: str | None
+    schema_hash: str
+
+    # Relationships
+    dataset:   Dataset
+    instances: list[RNTupleInstance]
+    fields:    list[Field]
+    ```
+    """
+
     __tablename__ = "rntuple"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     dataset_id: Mapped[int] = mapped_column(ForeignKey("dataset.id"), nullable=False)
     name: Mapped[str | None] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(String)
+    schema_hash: Mapped[str] = mapped_column(String)
 
     # Relationships
     dataset: Mapped[Dataset] = relationship(back_populates="rntuples")
@@ -98,11 +178,28 @@ class RNTuple(Base):
 
 
 class RNTupleInstance(Base):
+    """Table `rntuple_instance`.
+
+    ```python
+    # Columns
+    id:         int
+    file_id:    int
+    rntuple_id: int
+    entries:    int | None
+
+    # Relationships
+    file:           InputFile
+    rntuple:        RNTuple
+    cluster_groups: list[ClusterGroup]
+    ```
+    """
+
     __tablename__ = "rntuple_instance"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     file_id: Mapped[int] = mapped_column(ForeignKey("input_file.id"), nullable=False)
     rntuple_id: Mapped[int] = mapped_column(ForeignKey("rntuple.id"), nullable=False)
+    entries: Mapped[int | None] = mapped_column(Integer)
 
     # Relationships
     file: Mapped[InputFile] = relationship(back_populates="rntuple_instances")
@@ -113,6 +210,19 @@ class RNTupleInstance(Base):
 
 
 class ClusterGroup(Base):
+    """Table `cluster_group`.
+
+    ```python
+    # Columns
+    id:                  int
+    rntuple_instance_id: int
+
+    # Relationships
+    rntuple_instance: RNTupleInstance
+    clusters:         list[Cluster]
+    ```
+    """
+
     __tablename__ = "cluster_group"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -128,6 +238,21 @@ class ClusterGroup(Base):
 
 
 class Cluster(Base):
+    """Table `cluster`.
+
+    ```python
+    # Columns
+    id:               int
+    cluster_group_id: int
+    entry_start:      int | None
+    entry_stop:       int | None
+
+    # Relationships
+    cluster_group: ClusterGroup
+    page_groups:   list[PageGroup]
+    ```
+    """
+
     __tablename__ = "cluster"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -143,6 +268,31 @@ class Cluster(Base):
 
 
 class Field(Base):
+    """Table `field`.
+
+    ```python
+    # Columns
+    id:            int
+    rntuple_id:    int
+    parent_id:     int | None
+    version:       int
+    type_version:  int
+    name:          str
+    type_name:     str
+    type_alias:    str
+    description:   str
+    array_size:    int | None
+    type_checksum: int | None
+
+    # Relationships
+    rntuple:       RNTuple
+    parent:        Field | None
+    children:      list[Field]
+    columns:       list[Column]
+    alias_columns: list[AliasColumn]
+    ```
+    """
+
     __tablename__ = "field"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -168,6 +318,20 @@ class Field(Base):
 
 
 class Column(Base):
+    """Table `column`.
+
+    ```python
+    # Columns
+    id:       int
+    field_id: int
+
+    # Relationships
+    field:           Field
+    representations: list[ColumnRepresentation]
+    alias_columns:   list[AliasColumn]
+    ```
+    """
+
     __tablename__ = "column"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -182,6 +346,24 @@ class Column(Base):
 
 
 class ColumnRepresentation(Base):
+    """Table `column_representation`.
+
+    ```python
+    # Columns
+    id:                  int
+    column_id:           int
+    column_type:         int
+    bits_on_storage:     int
+    first_element_index: int | None
+    min_value:           float | None
+    max_value:           float | None
+
+    # Relationships
+    column:      Column
+    page_groups: list[PageGroup]
+    ```
+    """
+
     __tablename__ = "column_representation"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -200,6 +382,19 @@ class ColumnRepresentation(Base):
 
 
 class AliasColumn(Base):
+    """Table `alias_column`.
+
+    ```python
+    # Columns
+    field_id:  int
+    column_id: int
+
+    # Relationships
+    field:  Field
+    column: Column
+    ```
+    """
+
     __tablename__ = "alias_column"
 
     field_id: Mapped[int] = mapped_column(
@@ -213,22 +408,47 @@ class AliasColumn(Base):
     field: Mapped[Field] = relationship(back_populates="alias_columns")
     column: Mapped[Column] = relationship(back_populates="alias_columns")
 
+# sometimes we are ok with loading the relationship every time, 
+# other times there are soooo many that we only want to load it when we need it
+# e.g. for each column rep, there are very many page groups
+# look into sqlalchemy for this (lazy loading)
 
-class PageGroup(Base):
+
+class PageGroup(Base): # abbott: rename to column rep instance?
+    """Table `page_group`.
+
+    ```python
+    # Columns
+    id:                   int
+    cluster_id:           int
+    column_rep_id:        int
+    n_elements:           int
+    n_zero_elements:      int
+    compression_settings: str | None
+
+    # Relationships
+    cluster:               Cluster
+    column_representation: ColumnRepresentation
+    pages:                 list[Page]
+    ```
+    """
+
     __tablename__ = "page_group"
-    __table_args__ = (UniqueConstraint("cluster_id", "column_rep_id"),)
+    __table_args__ = (UniqueConstraint("cluster_id", "column_rep_id"),) # abbott: can make unique id? overkill? prolly not a good idea bc page would have to store two things instead of one
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    object_id: Mapped[int] = mapped_column(ForeignKey("object.id"), nullable=False)
     cluster_id: Mapped[int] = mapped_column(ForeignKey("cluster.id"), nullable=False)
     column_rep_id: Mapped[int] = mapped_column(
         ForeignKey("column_representation.id"), nullable=False
     )
-    element_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    n_elements: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    """Total elements of this column in the cluster, including leading implicit zeros."""
+    n_zero_elements: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    """Leading elements that read as zero and have no stored page."""
     compression_settings: Mapped[str | None] = mapped_column(String)
+    """Compression settings used for the pages of this column in this cluster."""
 
     # Relationships
-    object: Mapped[Object] = relationship(back_populates="page_groups")
     cluster: Mapped[Cluster] = relationship(back_populates="page_groups")
     column_representation: Mapped[ColumnRepresentation] = relationship(
         back_populates="page_groups"
@@ -237,13 +457,34 @@ class PageGroup(Base):
 
 
 class Page(Base):
+    """Table `page`.
+
+    ```python
+    # Columns
+    id:            int
+    page_group_id: int
+    first_element: int | None
+    bundle_id:     int
+    bundle_offset: int
+
+    # Relationships
+    page_bundle: PageBundle
+    page_group:  PageGroup
+    ```
+    """
+
     __tablename__ = "page"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     page_group_id: Mapped[int] = mapped_column(
         ForeignKey("page_group.id"), nullable=False
     )
-    index: Mapped[int | None] = mapped_column(Integer)
+    first_element: Mapped[int | None] = mapped_column(BigInteger)
+    """Index of the page's first element within this column in this cluster."""
+    bundle_id: Mapped[int] = mapped_column(ForeignKey("page_bundle.id"), nullable=False)
+    bundle_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    """Offset of the page's data within the page bundle (Ceph S3 object)."""
 
     # Relationships
+    page_bundle: Mapped[PageBundle] = relationship(back_populates="pages")
     page_group: Mapped[PageGroup] = relationship(back_populates="pages")
