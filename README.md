@@ -41,7 +41,17 @@ Version 1 stores the original file size, Adler-32, the 16-byte MD5 digest,
 the non-page bytes in file order and the extents. Each extent gives the bundle
 ID, offset within the bundle, length and offset in the original file.
 
-![ER Diagram](docs/robjectifier.png)
+![SQL tables and foreign keys in the Dataset, ObjectStore, and RNTuple groups](docs/robjectifier.svg)
+
+Arrows point from a foreign key (FK) to the column it references. PK marks a
+primary key and NN marks a required column. Each table shows its SQLite types.
+
+With [Graphviz](https://graphviz.org/download/) installed, run this command from
+the repository root to redraw the diagram after changing `src/rhydrator/model.py`.
+
+```sh
+uv run python scripts/draw_model.py
+```
 
 ## Running the tests
 
