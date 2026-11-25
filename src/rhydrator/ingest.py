@@ -8,7 +8,7 @@ import os
 import pickle
 from time import perf_counter
 from rootfilespec import reader
-from rootfilespec.bootstrap import ROOT3a3aRNTuple, TDatime
+from rootfilespec.bootstrap import ROOT3a3aRNTuple
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -27,13 +27,6 @@ class NewFile:
     dataset_name: str
     file_lfn: str
     file_path: str
-
-def convert_TDatime(tdatime: TDatime) -> datetime | None:
-    """convert root TDatime to regular python datetime object. 
-    This function should become obsolete after resolving rootfilespec 'TODO: convert to datetime through a MemberSerDe' """
-
-    from rootfilespec.bootstrap.TDatime import TDatime_to_datetime
-    return TDatime_to_datetime(tdatime)
 
 # function should take a dataset_name and return the dataset object if it exists, or create a new one if it doesn't
 def get_dataset(session: Session, dataset_name: str, dataset_created_at: datetime | None, debug: bool = False) -> m.Dataset:
@@ -106,7 +99,7 @@ def ingest_file(
         # 1.1 Find or create the Dataset
         if debug:
             print(f"\t\t{term.substep}Step 1.1:{term.reset} Find or create the Dataset", flush=True)  # noqa: T201
-        m_dataset = get_dataset(session, file.dataset_name, convert_TDatime(tdir.header.fDatimeC), debug=debug)
+        m_dataset = get_dataset(session, file.dataset_name, tdir.header.create_time(), debug=debug)
 
         # 1.2 Create the InputFile and initialize its page placements
         if debug:
