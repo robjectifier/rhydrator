@@ -2,10 +2,9 @@
 
 ## What this package is
 
-RHydrator is a Python library for **dehydrating** ROOT RNTuple files into
-metadata plus independently stored page bytes, and **rehydrating** metadata and
-pages back into the original ROOT files, byte for byte. The metadata lives in a
-relational database; the page bytes go to an object store.
+RHydrator's goal is to **dehydrate** ROOT RNTuple files into metadata and page
+bytes, then **rehydrate** them into the original ROOT files, byte for byte. A
+relational database holds the metadata and an object store holds the page bytes.
 
 It is one piece of the CMS Object Stores / Object Lakehouse project. CMS's
 file-based data tiers (AOD -> MiniAOD -> NanoAOD) copy unchanged content forward
@@ -15,16 +14,18 @@ pages are already referenced by _locators_, and the locator is extensible beyond
 an intra-file byte offset.
 
 The work is planned in the milestone
-[Phase 1 (local)](https://github.com/robjectifier/rhydrator/milestone/1): one
-issue per PR, each with its scope, the test that proves it, its dependencies and
-the decisions it rests on. Read the issue before starting on it.
+[Phase 1 (local)](https://github.com/robjectifier/rhydrator/milestone/1). Each
+PR delivers the part described in its issue. Read the issue for its scope and
+acceptance tests, and the README for the workflow available in your checkout.
 
 ## Design rules
 
-These are decided. A PR implements them; changing one is a decision for the
-maintainers, raised as a question, not made in code. Where older text (a
-comment, a docstring, an old design note) disagrees with them or with an issue,
-the rules and the issue win; ask if unsure.
+These requirements define what Phase 1 must deliver. Each issue covers part of
+that work. For example, #12 writes enough data to reconstruct an RNTuple-only
+file. Reading mixed TTree/RNTuple files belongs to #9, verified restoration to
+#13, the public round trip to #14, and schema reuse across files to #15. Check
+the issue before using existing code or older design notes as a precedent. Raise
+proposed design changes with the maintainers.
 
 - **Phase 1 is local:** page objects in a local folder, metadata in SQLite. S3
   and PostgreSQL come later, in objectservice; write SQL that works in both.
@@ -32,7 +33,8 @@ the rules and the issue win; ask if unsure.
   identical size, adler32 and MD5.
 - **rhydrator owns the database model** (`src/rhydrator/model.py`) and writes
   the SQL itself. objectservice, the service side, adapts to it, not the other
-  way round.
+  way round. After changing the model, regenerate the README's schema diagram
+  with `scripts/draw_model.py` as described in the [README](README.md).
 - **Rehydration-only information** (the non-page bytes and where each page goes
   back) lives in the rehydration record and `rehydration_info`, never in the
   RNTuple tables. Those tables model meaning, and may adapt the spec rather than
@@ -100,9 +102,11 @@ Related repositories:
   - Do **not** add a path or git dependency on a rootfilespec checkout to make
     something work. Unreleased rootfilespec changes are not rhydrator's concern
     until they are released.
-  - **Keep every rootfilespec call in one module** (`reader.py`, #9), so a
-    release that changes its API is a one-file port rather than a hunt through
-    the package. The one exception, `layoutviz.py`, ends with its port (#18).
+  - Put new rootfilespec calls in `reader.py`. The reader for local dehydration
+    (#12) passes rootfilespec objects to `ingest.py` and `bundle.py`. Issue #9
+    introduces rhydrator's own records so changes to rootfilespec's API can be
+    handled in the reader alone. The existing `layoutviz.py` exception ends with
+    its port in #18.
   - When reader behaviour looks wrong, check which rootfilespec is installed
     before debugging anything else:
 
@@ -126,11 +130,11 @@ Ruff and mypy are **not** declared in any dependency group, so `uv run ruff` /
 ## Working agreements
 
 - Add or update tests when behaviour changes.
-- Prefer small committed RNTuple fixtures (root-io-spec's `data/rntuple/`,
-  `scikit-hep-testdata`) over large files. Large files come only through the
-  `RHYDRATOR_LARGE_FILES` environment variable.
-- Tests must not depend on paths outside the repository, and must not silently
-  pass when a data file is missing: skip explicitly instead.
+- Use the fixtures in `tests/conftest.py` and avoid hard-coded paths outside the
+  repository. Prefer small RNTuple files. A missing root-io-spec submodule
+  fixture fails the test. A failed scikit-hep-testdata download skips the test.
+- Large-file tests skip when `RHYDRATOR_LARGE_FILES` is unset or empty. When it
+  names a directory, a missing file or a file of the wrong size fails the test.
 - Do not add dependencies without asking.
 - Problems that rootfilespec needs to fix are out of scope here. File them as
   issues on [`nsmith-/rootfilespec`](https://github.com/nsmith-/rootfilespec)
@@ -178,7 +182,8 @@ the spec where it applies.
 
 **PR descriptions** follow one shape:
 
-- `Fixes #N` first.
+- Use `Fixes #N` as the opening paragraph. In AI-generated descriptions, place
+  it immediately after the required disclosure.
 - What changed and why, citing spec sections and ROOT source lines.
 - A **Tests** section: what each test pins, which fail on `main`, and the
   full-suite count.
@@ -186,10 +191,13 @@ the spec where it applies.
 
 **Marking AI work:**
 
-- Issues, PR descriptions and comments start with `> 🤖 AI generated content`.
-- Issue bodies and PR descriptions also end with
-  `Assisted-by: <tool>:<model id>`.
-- Commit messages end with that same `Assisted-by:` line.
+- AI-generated issues, PR descriptions, reviews and comments start with
+  `> 🤖 AI generated content`.
+- End issue bodies and PR descriptions with one
+  `Assisted-by: <harness>:<model> (<roles>)` line per contributing model.
+- End an assisted commit message with one `Assisted-by: <harness>:<model>`
+  trailer naming the model that wrote the commit. Append ` et al.` when other
+  models contributed. Omit `Co-authored-by` trailers.
 - Text a person writes themselves carries neither mark.
 - In a guided PR (below), the agent's scaffolding and the person's code go in
   separate commits, so each is marked correctly: the agent's commits end with
@@ -205,9 +213,8 @@ this file applies as written.
 
 **Review and merge.**
 
-- Samantha reviews every PR on GitHub; Nick also reviews the model's revision
-  (#10) and the `layoutviz.py` PRs (#18, #19). Nothing merges until Samantha
-  approves; then it is squash-merged with GitHub's default message.
+- Samantha reviews every PR on GitHub. After she approves, squash-merge with
+  GitHub's default message.
 - Some issues name a review before the next stage (for example, records of a few
   fixtures shown before the next PR starts). Work that depends on it waits.
 - Answer reviewer comments in their thread, with the details.
