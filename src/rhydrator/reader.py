@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 from rootfilespec import reader
 from rootfilespec.bootstrap import ROOT3a3aRNTuple
-from rootfilespec.bootstrap.TDatime import TDatime_to_datetime
 from rootfilespec.rntuple.RNTuple import InterpretableColumnRange, InterpretablePage
 
 if TYPE_CHECKING:
@@ -37,7 +36,7 @@ def open_input(
     with reader.open_path(path) as source:
         directory = source.rootdir
         uuid = directory.fUUID.fUUID if directory.fUUID is not None else None
-        yield source, TDatime_to_datetime(directory.header.fDatimeC), uuid
+        yield source, directory.header.create_time(), uuid
 
 
 def rntuples(
