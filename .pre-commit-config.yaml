@@ -57,6 +57,7 @@ repos:
         args: []
         pass_filenames: false # to allow mypy to respect pyproject.toml config
         additional_dependencies:
+          - msgpack
           - nox
           - pytest
           - rootfilespec

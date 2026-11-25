@@ -191,6 +191,9 @@ Thumbs.db
 
 debug.py
 
+# Local ingest output
+/output/
+
 # uv
 
 uv.lock

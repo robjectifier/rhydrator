@@ -31,9 +31,44 @@
 <!-- prettier-ignore-end -->
 
 RHydrator is a Python library for (de)hydrating ROOT RNTuple files and storing
-the metadata in a relational database. The metadata is organized as shown:
+the metadata in a relational database.
 
-![ER Diagram](docs/robjectifier.png)
+## Dehydrate a local file
+
+Run from the repository root with the input path, its logical file name and the
+dataset name:
+
+```sh
+uv run python scripts/dehydrate_local.py reference/root-io-spec/data/rntuple/map.root /store/map.root maps --output_dir output
+```
+
+The command writes metadata to `rhydrator.db` in the output directory. Run it
+again there to add another file. Use `--recreate` only to replace the entire
+output directory and all its contents.
+
+The input's top-level keys must be RNTuples. Each ingest creates a new file
+record and imports its schema, including when the same file is supplied twice.
+
+Local ingest writes page bundles to `objects/<bundle_id>` under `--output_dir`.
+Each input file also has one MessagePack record at
+`objects/rehydration-<record_object_id>`. The SQLite `rehydration_info` row
+links the input file to that object and records its format version. Version 1
+stores the original file size, Adler-32, the 16-byte MD5 digest, the non-page
+bytes in file order and the extents. Each extent gives the bundle ID, offset
+within the bundle, length and offset in the original file.
+
+![SQL tables and foreign keys in the Dataset, ObjectStore, and RNTuple groups](docs/robjectifier.svg)
+
+Arrows point from a foreign key (FK) to the column it references. PK marks a
+primary key and NN marks a required column. Each table shows its SQLite types.
+
+With [Graphviz](https://graphviz.org/download/) installed, run this command from
+the repository root to redraw the diagram after changing
+`src/rhydrator/model.py`.
+
+```sh
+uv run python scripts/draw_model.py
+```
 
 ## Running the tests
 
